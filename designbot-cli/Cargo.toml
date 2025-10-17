@@ -1,0 +1,17 @@
+[package]
+name = "designbot-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "designbot"
+path = "src/main.rs"
+
+[dependencies]
+designbot.workspace = true
+designbot-render.workspace = true
+clap.workspace = true
+anyhow.workspace = true

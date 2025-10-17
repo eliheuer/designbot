@@ -1,0 +1,19 @@
+[package]
+name = "designbot-render"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+designbot.workspace = true
+vello.workspace = true
+kurbo.workspace = true
+peniko.workspace = true
+wgpu.workspace = true
+image.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+pollster = "0.4"
+futures-intrusive = "0.5"
