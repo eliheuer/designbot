@@ -1,12 +1,12 @@
 # DesignBot
 
-A Rust-based 2D graphics generation tool inspired by [DrawBot](https://www.drawbot.com/). Create vector graphics, images, and animations through Rust code with GPU-accelerated rendering powered by the [Linebender](https://github.com/linebender) ecosystem.
+A Rust-based 2D graphics generation tool inspired by [DrawBot](https://www.drawbot.com/) and [Processing](https://processing.org/). Create vector graphics, images, and animations through Rust code. This should be a fun way for type designers, graphic designers, artists, and students to learn [Rust](https://rust-lang.org/) programming. 
+
+<img width="3840" height="2160" alt="Image" src="https://github.com/user-attachments/assets/1c84c6ea-8603-439b-a3d8-6b9b209c9448" />
 
 ## Features
 
-- 🎨 **DrawBot-inspired API** - Familiar drawing primitives (rect, oval, line, polygon)
-- ⚡ **GPU-accelerated** - Fast rendering using Vello
-- 🦀 **Rust-native** - Type-safe API with excellent performance
+- 🎨 **DrawBot-inspired API** - Familiar drawing primitives (rect, oval, line, polygon, etc)
 - 🎯 **Self-contained** - Zero system dependencies
 - 📦 **Multiple output formats** - PNG (more coming: SVG, PDF, GIF, MP4)
 
@@ -17,7 +17,7 @@ A Rust-based 2D graphics generation tool inspired by [DrawBot](https://www.drawb
 cargo install --path designbot-cli
 
 # Or install from git (once published)
-# cargo install --git https://github.com/USER/designbot
+# cargo install --git https://github.com/eliheuer/designbot
 ```
 
 ## Quick Start
@@ -34,10 +34,12 @@ designbot --render my_design.rs --output my_design.png
 Examples output to the current directory:
 
 ```bash
+# Run from the designbot git repo
+cd designbot
 cargo run --example basic_shapes
 ```
 
-This generates `basic_shapes.png` (1000x1000px) in your current directory.
+This generates `basic_shapes.png` in your current directory.
 
 ## Usage Examples
 
@@ -49,11 +51,11 @@ Create a file `my_design.rs`:
 use designbot::prelude::*;
 
 // Just drawing commands - no main function needed
-canvas.fill(Color::rgb(255, 100, 100));
-canvas.rect(100.0, 100.0, 400.0, 400.0);
+ctx.fill(Color::rgb(255, 100, 100));
+ctx.rect(100.0, 100.0, 400.0, 400.0);
 
-canvas.fill(Color::rgb(100, 255, 100));
-canvas.oval(200.0, 200.0, 200.0, 200.0);
+ctx.fill(Color::rgb(100, 255, 100));
+ctx.oval(200.0, 200.0, 200.0, 200.0);
 ```
 
 Run with:
@@ -69,15 +71,15 @@ Create a file `custom_design.rs`:
 use designbot::prelude::*;
 
 fn main() {
-    let mut canvas = Canvas::new(800.0, 600.0);
+    let mut ctx = Canvas::new(800.0, 600.0);
 
     // Draw shapes
-    canvas.fill(Color::rgb(255, 200, 100));
-    canvas.rect(100.0, 100.0, 600.0, 400.0);
+    ctx.fill(Color::rgb(255, 200, 100));
+    ctx.rect(100.0, 100.0, 600.0, 400.0);
 
     // Render
     let renderer = Renderer::new(800, 600);
-    renderer.render_to_png(&canvas, "output.png").unwrap();
+    renderer.render_to_png(&ctx, "output.png").unwrap();
 }
 ```
 
@@ -95,14 +97,14 @@ Create examples in `examples/` directory:
 use designbot::prelude::*;
 
 fn main() {
-    let mut canvas = Canvas::new(600.0, 600.0);
+    let mut ctx = Canvas::new(600.0, 600.0);
 
-    canvas.fill(Color::rgb(100, 200, 255));
-    canvas.oval(100.0, 100.0, 400.0, 400.0);
+    ctx.fill(Color::rgb(100, 200, 255));
+    ctx.oval(100.0, 100.0, 400.0, 400.0);
 
     // Output to current directory
     let renderer = Renderer::new(600, 600);
-    renderer.render_to_png(&canvas, "my_example.png").unwrap();
+    renderer.render_to_png(&ctx, "my_example.png").unwrap();
 
     println!("Rendered my_example.png");
 }
@@ -118,39 +120,39 @@ cargo run --example my_example
 
 ### Canvas Management
 ```rust
-let mut canvas = Canvas::new(800.0, 600.0);
+let mut ctx = Canvas::new(800.0, 600.0);
 ```
 
 ### Drawing Primitives
 ```rust
-canvas.rect(x, y, width, height);
-canvas.oval(x, y, width, height);
-canvas.line(x1, y1, x2, y2);
-canvas.polygon(&[(x1, y1), (x2, y2), ...], close);
+ctx.rect(x, y, width, height);
+ctx.oval(x, y, width, height);
+ctx.line(x1, y1, x2, y2);
+ctx.polygon(&[(x1, y1), (x2, y2), ...], close);
 ```
 
 ### Colors and Styling
 ```rust
-canvas.fill(Color::rgb(255, 0, 0));
-canvas.stroke(Color::black());
-canvas.stroke_width(2.0);
-canvas.no_fill();
-canvas.no_stroke();
+ctx.fill(Color::rgb(255, 0, 0));
+ctx.stroke(Color::black());
+ctx.stroke_width(2.0);
+ctx.no_fill();
+ctx.no_stroke();
 ```
 
 ### Transformations
 ```rust
-canvas.save();           // Push state
-canvas.translate(x, y);
-canvas.rotate(degrees);
-canvas.scale(factor);
-canvas.restore();        // Pop state
+ctx.save();           // Push state
+ctx.translate(x, y);
+ctx.rotate(degrees);
+ctx.scale(factor);
+ctx.restore();        // Pop state
 ```
 
 ### Rendering
 ```rust
 let renderer = Renderer::new(width, height);
-renderer.render_to_png(&canvas, "output.png")?;
+renderer.render_to_png(&ctx, "output.png").unwrap();
 ```
 
 ## Project Structure
@@ -161,7 +163,7 @@ designbot/
 ├── designbot-render/    # Rendering backend (Vello integration)
 ├── designbot-cli/       # CLI application
 ├── examples/            # Example scripts with outputs
-└── docs/               # Documentation and project plan
+└── docs/                # Documentation and project plan
 ```
 
 ## Technology Stack
@@ -227,4 +229,4 @@ MIT OR Apache-2.0
 ## Acknowledgments
 
 Inspired by [DrawBot](https://www.drawbot.com/) by Just van Rossum and Frederik Berlaen.
-Built on the amazing [Linebender](https://github.com/linebender) ecosystem.
+Built on crates from the [Linebender](https://github.com/linebender) ecosystem.

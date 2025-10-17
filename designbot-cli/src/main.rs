@@ -117,7 +117,7 @@ fn create_wrapper_script(user_script: &str, output_path: &Path) -> Result<String
 use designbot::{{Canvas, Color}};
 use designbot_render::Renderer;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {{
+fn main() {{
     let mut canvas = Canvas::new(800.0, 600.0);
 
     // User code
@@ -125,9 +125,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {{
 
     // Render
     let renderer = Renderer::new(800, 600);
-    renderer.render_to_png(&canvas, "{output}")?;
-
-    Ok(())
+    renderer.render_to_png(&canvas, "{output}").unwrap();
 }}
 "#,
             user_script = user_script,
