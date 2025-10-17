@@ -435,10 +435,8 @@ dependencies = [
 name = "designbot"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "kurbo",
- "peniko",
- "thiserror 2.0.17",
+ "designbot-core",
+ "designbot-render",
 ]
 
 [[package]]
@@ -447,16 +445,18 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "designbot",
+ "designbot-core",
  "designbot-render",
 ]
 
 [[package]]
-name = "designbot-examples"
+name = "designbot-core"
 version = "0.1.0"
 dependencies = [
- "designbot",
- "designbot-render",
+ "anyhow",
+ "kurbo",
+ "peniko",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -464,7 +464,7 @@ name = "designbot-render"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "designbot",
+ "designbot-core",
  "futures-intrusive",
  "image",
  "kurbo",

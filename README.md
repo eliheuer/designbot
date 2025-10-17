@@ -46,6 +46,8 @@ This generates `basic_shapes.png` (1000x1000px) in your current directory.
 Create a file `my_design.rs`:
 
 ```rust
+use designbot::prelude::*;
+
 // Just drawing commands - no main function needed
 canvas.fill(Color::rgb(255, 100, 100));
 canvas.rect(100.0, 100.0, 400.0, 400.0);
@@ -64,10 +66,9 @@ designbot --render my_design.rs --output my_design.png
 Create a file `custom_design.rs`:
 
 ```rust
-use designbot::{Canvas, Color};
-use designbot_render::Renderer;
+use designbot::prelude::*;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     let mut canvas = Canvas::new(800.0, 600.0);
 
     // Draw shapes
@@ -76,9 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Render
     let renderer = Renderer::new(800, 600);
-    renderer.render_to_png(&canvas, "output.png")?;
-
-    Ok(())
+    renderer.render_to_png(&canvas, "output.png").unwrap();
 }
 ```
 
@@ -93,10 +92,9 @@ Create examples in `examples/` directory:
 
 ```rust
 // examples/my_example.rs
-use designbot::{Canvas, Color};
-use designbot_render::Renderer;
+use designbot::prelude::*;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     let mut canvas = Canvas::new(600.0, 600.0);
 
     canvas.fill(Color::rgb(100, 200, 255));
@@ -104,10 +102,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Output to current directory
     let renderer = Renderer::new(600, 600);
-    renderer.render_to_png(&canvas, "my_example.png")?;
+    renderer.render_to_png(&canvas, "my_example.png").unwrap();
 
     println!("Rendered my_example.png");
-    Ok(())
 }
 ```
 

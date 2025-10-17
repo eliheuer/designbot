@@ -1,4 +1,4 @@
-use designbot::{Canvas, DesignBotError};
+use designbot_core::{Canvas, DesignBotError};
 use peniko::Fill;
 use std::num::NonZeroUsize;
 use vello::{
@@ -55,10 +55,10 @@ impl Renderer {
 
         // Add all draw commands
         for command in canvas.commands() {
-            use designbot::canvas::ShapeType;
+            use designbot_core::canvas::ShapeType;
 
             match command {
-                designbot::canvas::DrawCommand::FillShape {
+                designbot_core::canvas::DrawCommand::FillShape {
                     shape,
                     brush,
                     transform,
@@ -76,7 +76,7 @@ impl Renderer {
                         scene.fill(Fill::NonZero, *transform, brush, None, p);
                     }
                 },
-                designbot::canvas::DrawCommand::StrokeShape {
+                designbot_core::canvas::DrawCommand::StrokeShape {
                     shape,
                     brush,
                     stroke,

@@ -7,7 +7,7 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-designbot.workspace = true
+designbot-core.workspace = true
 vello.workspace = true
 kurbo.workspace = true
 peniko.workspace = true

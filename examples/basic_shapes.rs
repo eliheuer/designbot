@@ -1,13 +1,12 @@
-use designbot::{Canvas, Color};
-use designbot_render::Renderer;
+use designbot::prelude::*;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     // Create a 1000x1000 canvas (same size as DrawBot examples)
-    let mut canvas = Canvas::new(100.0, 100.0);
+    let mut canvas = Canvas::new(1000.0, 1000.0);
 
     // Example 1: Rectangle
     // DrawBot: rect(100, 100, 800, 800)
-    canvas.rect(100.0, 100.0, 100.0, 100.0);
+    canvas.rect(10.0, 10.0, 100.0, 100.0);
 
     // Example 2: Oval
     // DrawBot: oval(100, 100, 800, 800)
@@ -40,9 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Render to PNG in current directory
     let output_path = "basic_shapes.png";
     let renderer = Renderer::new(1000, 1000);
-    renderer.render_to_png(&canvas, output_path)?;
+    renderer.render_to_png(&canvas, output_path).unwrap();
 
     println!("Rendered {}", output_path);
-
-    Ok(())
 }

@@ -11,7 +11,7 @@ name = "designbot"
 path = "src/main.rs"
 
 [dependencies]
-designbot.workspace = true
+designbot-core.workspace = true
 designbot-render.workspace = true
 clap.workspace = true
 anyhow.workspace = true

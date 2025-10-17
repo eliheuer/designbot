@@ -183,25 +183,31 @@ designbot-render = {{ git = "https://github.com/USER/designbot", branch = "main"
 }
 
 fn get_designbot_path() -> Result<PathBuf> {
-    // Try to find the designbot library relative to the CLI binary
+    // Try to find the workspace root (which has the main designbot package)
     let exe_path = std::env::current_exe()?;
     let exe_dir = exe_path.parent().context("Failed to get exe directory")?;
 
     // Try multiple locations
     let candidates = vec![
-        // When running from cargo in workspace (target/debug or target/release)
-        exe_dir.parent().and_then(|p| p.parent()).map(|p| p.join("designbot")),
+        // When running from cargo in workspace (target/debug or target/release) - go up to workspace root
+        exe_dir.parent().and_then(|p| p.parent()),
         // When running from current directory
-        Some(PathBuf::from("designbot")),
-        // When in a sibling directory
-        Some(PathBuf::from("../designbot")),
+        Some(PathBuf::from(".")),
+        // When in a subdirectory
+        Some(PathBuf::from("..")),
     ];
 
     for candidate in candidates.into_iter().flatten() {
-        if candidate.exists() && candidate.join("Cargo.toml").exists() {
-            // Return absolute path
-            return fs::canonicalize(&candidate)
-                .with_context(|| format!("Failed to canonicalize path: {}", candidate.display()));
+        // Check if this is the workspace root by looking for the main Cargo.toml
+        let cargo_toml = candidate.join("Cargo.toml");
+        if cargo_toml.exists() {
+            // Check if it contains the designbot package
+            if let Ok(contents) = fs::read_to_string(&cargo_toml) {
+                if contents.contains("name = \"designbot\"") || contents.contains("members") {
+                    return fs::canonicalize(&candidate)
+                        .with_context(|| format!("Failed to canonicalize path: {}", candidate.display()));
+                }
+            }
         }
     }
 
