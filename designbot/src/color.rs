@@ -40,7 +40,7 @@ impl Color {
 
     /// Convert to peniko Color
     pub fn to_peniko(&self) -> peniko::Color {
-        peniko::Color::rgba8(self.r, self.g, self.b, self.a)
+        peniko::Color::from_rgba8(self.r, self.g, self.b, self.a)
     }
 
     /// Convert from normalized float values (0.0-1.0)

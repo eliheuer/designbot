@@ -168,8 +168,9 @@ designbot/
 
 ## Technology Stack
 
-- **[Vello](https://github.com/linebender/vello)** - GPU-accelerated 2D rendering
-- **[Kurbo](https://github.com/linebender/kurbo)** - 2D curves and paths
+- **[vello_cpu](https://github.com/linebender/vello)** - CPU-based 2D rendering (faster for reading back to CPU memory)
+- **[AnyRender](https://github.com/DioxusLabs/anyrender)** - Portable rendering abstraction across backends
+- **[Kurbo](https://github.com/linebender/kurbo)** - 2D curves and paths (including native Ellipse type)
 - **[Peniko](https://github.com/linebender/peniko)** - Styling primitives
 - **[wgpu](https://wgpu.rs/)** - GPU access
 - **[image](https://github.com/image-rs/image)** - Image encoding/decoding
@@ -189,6 +190,11 @@ designbot/
 - [x] Graphics state stack (save/restore)
 - [x] Basic transformations (translate, rotate, scale)
 - [ ] Path operations (bezier curves)
+
+🔧 **Current Improvements**:
+- Migrating to vello_cpu for better CPU readback performance
+- Integrating AnyRender for portable rendering across backends
+- Using Kurbo's native Ellipse type for oval rendering
 
 🔜 **Coming Soon**:
 - Text rendering (Parley integration)

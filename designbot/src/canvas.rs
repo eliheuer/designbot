@@ -1,6 +1,6 @@
 use crate::color::Color;
 use crate::state::StateStack;
-use kurbo::{Affine, BezPath, Circle, Line, Point, Rect, Stroke};
+use kurbo::{Affine, BezPath, Circle, Ellipse, Line, Point, Rect, Stroke};
 use peniko::Brush;
 
 /// Drawing command that can be rendered
@@ -24,6 +24,7 @@ pub enum DrawCommand {
 pub enum ShapeType {
     Rect(Rect),
     Circle(Circle),
+    Ellipse(Ellipse),
     Line(Line),
     Path(BezPath),
 }
@@ -101,43 +102,21 @@ impl Canvas {
 
     /// Draw an oval (ellipse)
     pub fn oval(&mut self, x: f64, y: f64, width: f64, height: f64) -> &mut Self {
-        // For now, use a circle for square dimensions, or approximate with a path
-        // Vello/kurbo Circle is always circular, so we'll need to transform for ovals
+        // Calculate center and radii
         let center_x = x + width / 2.0;
         let center_y = y + height / 2.0;
+        let radius_x = width / 2.0;
+        let radius_y = height / 2.0;
 
         if (width - height).abs() < 0.001 {
-            // It's a circle
+            // It's a circle - use Circle for better performance
             let circle = Circle::new((center_x, center_y), width / 2.0);
             self.draw_shape(ShapeType::Circle(circle));
         } else {
-            // Create an ellipse using a transformed circle
-            let circle = Circle::new((0.0, 0.0), 1.0);
-            let transform = Affine::translate((center_x, center_y))
-                * Affine::scale_non_uniform(width / 2.0, height / 2.0);
-
-            let state = self.state.current();
-            let combined_transform = state.transform * transform;
-
-            // Draw the circle with the ellipse transform
-            if let Some(fill_color) = state.fill_color {
-                self.commands.push(DrawCommand::FillShape {
-                    shape: ShapeType::Circle(circle),
-                    brush: Brush::Solid(fill_color.to_peniko()),
-                    transform: combined_transform,
-                });
-            }
-
-            if let Some(stroke_color) = state.stroke_color {
-                self.commands.push(DrawCommand::StrokeShape {
-                    shape: ShapeType::Circle(circle),
-                    brush: Brush::Solid(stroke_color.to_peniko()),
-                    stroke: Stroke::new(state.stroke_width),
-                    transform: combined_transform,
-                });
-            }
-
-            return self;
+            // Use Kurbo's native Ellipse type
+            // Ellipse::new(center, radii, x_rotation)
+            let ellipse = Ellipse::new((center_x, center_y), (radius_x, radius_y), 0.0);
+            self.draw_shape(ShapeType::Ellipse(ellipse));
         }
 
         self

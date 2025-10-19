@@ -9,8 +9,12 @@ license.workspace = true
 [dependencies]
 designbot-core.workspace = true
 vello.workspace = true
+vello_cpu.workspace = true
+anyrender.workspace = true
+anyrender_vello_cpu.workspace = true
 kurbo.workspace = true
 peniko.workspace = true
+color.workspace = true
 wgpu.workspace = true
 image.workspace = true
 anyhow.workspace = true

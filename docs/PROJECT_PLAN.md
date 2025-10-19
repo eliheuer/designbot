@@ -116,15 +116,16 @@ designbot/
 
 ### Linebender Ecosystem
 
-1. **Vello** - GPU-accelerated 2D rendering
-   - Primary rendering engine
-   - High-performance scene rendering
-   - PostScript-inspired API
+1. **vello_cpu** - CPU-based 2D rendering
+   - Primary rendering engine for CPU readback scenarios
+   - Faster than vello for reading back to CPU memory
+   - Easier dependency management
+   - Optimized for PNG/raster output workflows
 
 2. **Kurbo** - 2D curves and paths
    - Bezier curve manipulation
    - Path operations
-   - Geometric primitives
+   - Geometric primitives (includes native Ellipse type)
 
 3. **Peniko** - Styling primitives
    - Fill and stroke styles
@@ -135,6 +136,14 @@ designbot/
    - Font handling
    - Text shaping and layout
    - Unicode support
+
+### Rendering Abstraction
+
+**AnyRender** - Portable rendering abstraction
+   - Provides portability across rendering backends
+   - Potential for future GUI toolkit integration
+   - Includes ImageRenderer implementations for easier Vec<u8> output handling
+   - Simplifies boilerplate around pixel buffer management
 
 ### Additional Dependencies
 
@@ -350,6 +359,13 @@ pub type Result<T> = std::result::Result<T, DesignBotError>;
 
 ## Future Enhancements
 
+### Rendering Backend Improvements
+- **AnyRender Integration**: Integrate the AnyRender abstraction layer for even better portability
+  - Currently using vello_cpu directly, which provides excellent performance
+  - AnyRender would add another layer of abstraction for backend switching
+  - Could enable easier integration with different rendering backends
+  - anyrender_vello_cpu crate available when needed (v0.8.0)
+
 ### Desktop Application
 - Native GUI application (using Xilem or other Rust GUI framework)
 - Interactive code editor
@@ -365,7 +381,7 @@ pub type Result<T> = std::result::Result<T, DesignBotError>;
 - Variable/dynamic graphics
 
 ### Performance
-- Parallel rendering
+- Parallel rendering (vello_cpu supports multithreading)
 - Caching and optimization
 - Headless server mode
 - Cloud rendering API
@@ -383,23 +399,24 @@ pub type Result<T> = std::result::Result<T, DesignBotError>;
 
 **Recommended**: Dynamic library loading with well-defined API boundary
 
-### 2. Headless Rendering
+### 2. Rendering Backend Selection
 
-**Challenge**: Vello requires wgpu/GPU access
+**Challenge**: Choosing optimal rendering approach for different output scenarios
 
 **Solution**:
-- wgpu supports software adapters
-- Fallback to CPU rendering if GPU unavailable
-- Consider software-only rendering backend for CI/CD
+- Use vello_cpu for PNG/raster output (faster CPU readback, easier dependency management)
+- Integrate AnyRender for backend portability and future GUI toolkit support
+- AnyRender's ImageRenderer implementations reduce boilerplate for Vec<u8> output
+- Enables flexibility to add additional rendering backends in the future
 
 ### 3. PDF/SVG Generation
 
-**Challenge**: Vello renders to GPU textures, not vector formats
+**Challenge**: CPU-based rendering produces rasters, not vector formats
 
 **Solution**:
 - Maintain scene graph representation
 - Implement separate SVG/PDF exporters that traverse scene graph
-- Use Vello for raster output, direct path-to-vector for PDF/SVG
+- Use vello_cpu for raster output, direct path-to-vector for PDF/SVG
 
 ### 4. Font Handling
 
@@ -410,6 +427,15 @@ pub type Result<T> = std::result::Result<T, DesignBotError>;
 - Bundle common fonts with CLI
 - Support custom font directories
 - Font fallback system
+
+### 5. Ellipse Rendering
+
+**Challenge**: Originally implemented ellipses as transformed circles
+
+**Solution**:
+- Use Kurbo's native Ellipse type for proper ellipse rendering
+- Simplifies code and improves accuracy
+- Eliminates need for manual circle transformation
 
 ## Success Metrics
 

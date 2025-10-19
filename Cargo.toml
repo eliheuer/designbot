@@ -33,9 +33,17 @@ license = "Apache-2.0"
 [workspace.dependencies]
 # Linebender ecosystem
 vello = "0.3"
-kurbo = "0.11"
-peniko = "0.2"
+vello_cpu = "0.0.4"
+kurbo = "0.12"
+peniko = "0.5"
 parley = "0.2"
+
+# AnyRender abstraction
+anyrender = "0.6.1"
+anyrender_vello_cpu = "0.8.0"
+
+# Color support
+color = "0.3"
 
 # Graphics and rendering
 wgpu = "22"
