@@ -4,10 +4,8 @@ fn main() {
     // Create a 1000x1000 canvas (same size as DrawBot examples)
     let mut ctx = Canvas::new(1000.0, 1000.0);
 
-    // Dark gray background
-    ctx.fill(Color::rgb(10, 10, 10));
-    ctx.no_stroke();
-    ctx.rect(0.0, 0.0, 1000.0, 1000.0);
+    // Set dark gray background
+    ctx.background(Color::rgb(10, 10, 10));
 
     // Example 1: Rectangle
     ctx.fill(Color::rgb(100, 100, 100));

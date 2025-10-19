@@ -33,6 +33,7 @@ pub enum ShapeType {
 pub struct Canvas {
     width: f64,
     height: f64,
+    background_color: Option<Color>,
     state: StateStack,
     commands: Vec<DrawCommand>,
 }
@@ -43,6 +44,7 @@ impl Canvas {
         Self {
             width,
             height,
+            background_color: Some(Color::white()), // Default white background
             state: StateStack::new(),
             commands: Vec::new(),
         }
@@ -61,6 +63,17 @@ impl Canvas {
     /// Get all draw commands
     pub fn commands(&self) -> &[DrawCommand] {
         &self.commands
+    }
+
+    /// Get the background color
+    pub fn background_color(&self) -> Option<Color> {
+        self.background_color
+    }
+
+    /// Set the background color
+    pub fn background(&mut self, color: Color) -> &mut Self {
+        self.background_color = Some(color);
+        self
     }
 
     /// Set the fill color

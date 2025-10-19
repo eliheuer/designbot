@@ -23,21 +23,24 @@ impl Renderer {
         let mut rgba_data = Vec::new();
         renderer.render_to_vec(
             |painter| {
-                // Draw white background
-                let background = kurbo::Rect::new(
-                    0.0,
-                    0.0,
-                    self.width as f64,
-                    self.height as f64,
-                );
-                let white = Paint::Solid(AlphaColor::from_rgba8(255, 255, 255, 255));
-                painter.fill(
-                    Fill::NonZero,
-                    kurbo::Affine::IDENTITY,
-                    &white,
-                    None,
-                    &background,
-                );
+                // Draw background if set
+                if let Some(bg_color) = canvas.background_color() {
+                    let background = kurbo::Rect::new(
+                        0.0,
+                        0.0,
+                        self.width as f64,
+                        self.height as f64,
+                    );
+                    let rgba = bg_color.to_peniko().to_rgba8();
+                    let bg_paint = Paint::Solid(AlphaColor::from_rgba8(rgba.r, rgba.g, rgba.b, rgba.a));
+                    painter.fill(
+                        Fill::NonZero,
+                        kurbo::Affine::IDENTITY,
+                        &bg_paint,
+                        None,
+                        &background,
+                    );
+                }
 
                 // Draw all canvas commands
                 for command in canvas.commands() {
