@@ -17,6 +17,26 @@ pub enum DrawCommand {
         stroke: Stroke,
         transform: Affine,
     },
+    DrawText {
+        text: String,
+        x: f64,
+        y: f64,
+        font_family: Option<String>,
+        font_size: f64,
+        brush: Brush,
+        transform: Affine,
+    },
+    DrawTextBox {
+        text: String,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+        font_family: Option<String>,
+        font_size: f64,
+        brush: Brush,
+        transform: Affine,
+    },
 }
 
 /// Supported shape types
@@ -237,6 +257,58 @@ impl Canvas {
         let current_transform = self.state.current().transform;
         self.state.current_mut().transform =
             current_transform * Affine::scale_non_uniform(sx, sy);
+        self
+    }
+
+    /// Set the font family
+    pub fn font(&mut self, family: &str) -> &mut Self {
+        self.state.current_mut().font_family = Some(family.to_string());
+        self
+    }
+
+    /// Set the font size
+    pub fn font_size(&mut self, size: f64) -> &mut Self {
+        self.state.current_mut().font_size = size;
+        self
+    }
+
+    /// Draw text at a specific position
+    pub fn text(&mut self, text: &str, x: f64, y: f64) -> &mut Self {
+        let state = self.state.current();
+
+        if let Some(fill_color) = state.fill_color {
+            self.commands.push(DrawCommand::DrawText {
+                text: text.to_string(),
+                x,
+                y,
+                font_family: state.font_family.clone(),
+                font_size: state.font_size,
+                brush: Brush::Solid(fill_color.to_peniko()),
+                transform: state.transform,
+            });
+        }
+
+        self
+    }
+
+    /// Draw text within a bounding box with word wrapping
+    pub fn text_box(&mut self, text: &str, x: f64, y: f64, width: f64, height: f64) -> &mut Self {
+        let state = self.state.current();
+
+        if let Some(fill_color) = state.fill_color {
+            self.commands.push(DrawCommand::DrawTextBox {
+                text: text.to_string(),
+                x,
+                y,
+                width,
+                height,
+                font_family: state.font_family.clone(),
+                font_size: state.font_size,
+                brush: Brush::Solid(fill_color.to_peniko()),
+                transform: state.transform,
+            });
+        }
+
         self
     }
 }

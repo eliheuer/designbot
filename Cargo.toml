@@ -23,6 +23,10 @@ designbot-render = { path = "designbot-render" }
 name = "basic_shapes"
 path = "examples/basic_shapes.rs"
 
+[[example]]
+name = "basic_text"
+path = "examples/basic_text.rs"
+
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
@@ -37,6 +41,7 @@ vello_cpu = "0.0.4"
 kurbo = "0.12"
 peniko = "0.5"
 parley = "0.2"
+swash = "0.1"
 
 # AnyRender abstraction
 anyrender = "0.6.1"

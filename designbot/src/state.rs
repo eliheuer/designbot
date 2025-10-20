@@ -7,6 +7,8 @@ pub struct GraphicsState {
     pub stroke_color: Option<Color>,
     pub stroke_width: f64,
     pub transform: kurbo::Affine,
+    pub font_family: Option<String>,
+    pub font_size: f64,
 }
 
 impl Default for GraphicsState {
@@ -16,6 +18,8 @@ impl Default for GraphicsState {
             stroke_color: None,
             stroke_width: 1.0,
             transform: kurbo::Affine::IDENTITY,
+            font_family: None,
+            font_size: 12.0,
         }
     }
 }

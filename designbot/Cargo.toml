@@ -9,5 +9,6 @@ license.workspace = true
 [dependencies]
 kurbo.workspace = true
 peniko.workspace = true
+parley.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
