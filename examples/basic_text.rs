@@ -7,21 +7,21 @@ fn main() {
     // Set light gray background
     ctx.background(Color::rgb(190, 190, 190));
 
-    // Example 1: Simple text with default font
+    // Example 1: Simple text
     ctx.fill(Color::rgb(20, 20, 20));
-    ctx.font("RecMonoDuotone Nerd Font Mono");
-    ctx.font_size(64.0);
+    ctx.font("Bezy Grotesk");
+    ctx.font_size(96.0);
     ctx.text("Hello DesignBot", 100.0, 150.0);
 
-    // Example 2: Larger text
+    // Example 2: Red Text
     ctx.fill(Color::rgb(200, 50, 50));
     ctx.font_size(128.0);
-    ctx.text("Big Text", 100.0, 300.0);
+    ctx.text("Big Red Font", 95.0, 280.0);
 
-    // Example 3: Text with specified font (if available)
+    // Example 3: Blue Text
     ctx.fill(Color::rgb(50, 100, 200));
     ctx.font_size(64.0);
-    ctx.text("NOT ARIAL Font", 100.0, 450.0);
+    ctx.text("Blue Font", 100.0, 450.0);
 
     // Example 4: Text box with wrapping
     ctx.fill(Color::rgb(200, 50, 50));
@@ -31,8 +31,8 @@ fn main() {
 
     // Draw a rectangle to show the text box bounds
     ctx.no_fill();
-    ctx.stroke(Color::rgb(150, 150, 150));
-    ctx.stroke_width(2.0);
+    ctx.stroke(Color::rgb(50, 50, 50));
+    ctx.stroke_width(4.0);
     ctx.rect(100.0, 550.0, 800.0, 400.0);
 
     // Render to PNG in current directory
