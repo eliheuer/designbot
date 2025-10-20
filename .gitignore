@@ -28,3 +28,11 @@ target
 *.svg
 *.gif
 *.mp4
+
+# Font files (examples should download these separately)
+examples/fonts/*.ttf
+examples/fonts/*.otf
+examples/fonts/*.woff
+examples/fonts/*.woff2
+# Keep the README
+!examples/fonts/README.md

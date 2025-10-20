@@ -186,13 +186,15 @@ fn get_designbot_path() -> Result<PathBuf> {
     let exe_dir = exe_path.parent().context("Failed to get exe directory")?;
 
     // Try multiple locations
+    let current_dir = PathBuf::from(".");
+    let parent_dir = PathBuf::from("..");
     let candidates = vec![
         // When running from cargo in workspace (target/debug or target/release) - go up to workspace root
         exe_dir.parent().and_then(|p| p.parent()),
         // When running from current directory
-        Some(PathBuf::from(".")),
+        Some(current_dir.as_path()),
         // When in a subdirectory
-        Some(PathBuf::from("..")),
+        Some(parent_dir.as_path()),
     ];
 
     for candidate in candidates.into_iter().flatten() {

@@ -7,18 +7,49 @@ use peniko::Fill;
 use parley::{FontContext, LayoutContext, layout::PositionedLayoutItem};
 use parley::style::{FontFamily, FontStack, StyleProperty};
 use std::borrow::Cow;
+use std::cell::RefCell;
+use std::path::Path;
 
 pub struct Renderer {
     width: u32,
     height: u32,
+    custom_fonts: Vec<Vec<u8>>,
 }
 
 impl Renderer {
     pub fn new(width: u32, height: u32) -> Self {
-        Self { width, height }
+        Self {
+            width,
+            height,
+            custom_fonts: Vec::new(),
+        }
+    }
+
+    /// Load a font from a file path and register it for use
+    ///
+    /// # Example
+    /// ```no_run
+    /// use designbot::Renderer;
+    /// let mut renderer = Renderer::new(800, 600);
+    /// renderer.load_font("fonts/MyFont.ttf").unwrap();
+    /// ```
+    pub fn load_font(&mut self, path: impl AsRef<Path>) -> Result<(), DesignBotError> {
+        let font_data = std::fs::read(path.as_ref())
+            .map_err(|e| DesignBotError::IOError(e))?;
+        self.custom_fonts.push(font_data);
+        Ok(())
     }
 
     pub fn render_to_png(&self, canvas: &Canvas, output_path: &str) -> Result<(), DesignBotError> {
+        // Create font context and register custom fonts
+        let mut font_cx = FontContext::default();
+        for font_data in &self.custom_fonts {
+            font_cx.collection.register_fonts(font_data.clone());
+        }
+
+        // Wrap in RefCell for interior mutability within the closure
+        let font_cx = RefCell::new(font_cx);
+
         // Create AnyRender ImageRenderer with vello_cpu backend
         let mut renderer = VelloCpuImageRenderer::new(self.width, self.height);
 
@@ -47,7 +78,7 @@ impl Renderer {
 
                 // Draw all canvas commands
                 for command in canvas.commands() {
-                    Self::render_command(painter, command);
+                    Self::render_command(painter, command, &font_cx);
                 }
             },
             &mut rgba_data,
@@ -67,7 +98,11 @@ impl Renderer {
     }
 
     /// Render a single draw command using the PaintScene API
-    fn render_command(painter: &mut impl PaintScene, command: &designbot_core::canvas::DrawCommand) {
+    fn render_command(
+        painter: &mut impl PaintScene,
+        command: &designbot_core::canvas::DrawCommand,
+        font_cx: &RefCell<FontContext>,
+    ) {
         use designbot_core::canvas::DrawCommand;
 
         match command {
@@ -124,7 +159,7 @@ impl Renderer {
                 brush,
                 transform,
             } => {
-                Self::render_text(painter, text, *x, *y, None, font_family.as_deref(), *font_size, brush, transform);
+                Self::render_text(painter, text, *x, *y, None, font_family.as_deref(), *font_size, brush, transform, font_cx);
             }
             DrawCommand::DrawTextBox {
                 text,
@@ -137,7 +172,7 @@ impl Renderer {
                 brush,
                 transform,
             } => {
-                Self::render_text(painter, text, *x, *y, Some((*width, *height)), font_family.as_deref(), *font_size, brush, transform);
+                Self::render_text(painter, text, *x, *y, Some((*width, *height)), font_family.as_deref(), *font_size, brush, transform, font_cx);
             }
         }
     }
@@ -242,13 +277,14 @@ impl Renderer {
         font_size: f64,
         brush: &peniko::Brush,
         transform: &kurbo::Affine,
+        font_cx: &RefCell<FontContext>,
     ) {
-        // Create font and layout contexts
-        let mut font_cx = FontContext::default();
+        // Get mutable reference to font context
+        let mut font_cx_ref = font_cx.borrow_mut();
         let mut layout_cx: LayoutContext<[u8; 4]> = LayoutContext::new();
 
         // Create a layout builder
-        let mut builder = layout_cx.ranged_builder(&mut font_cx, text, 1.0);
+        let mut builder = layout_cx.ranged_builder(&mut *font_cx_ref, text, 1.0);
 
         // Set font family if specified
         if let Some(family) = font_family {

@@ -149,6 +149,36 @@ ctx.scale(factor);
 ctx.restore();        // Pop state
 ```
 
+### Text Rendering
+```rust
+// Set font and size
+ctx.font("Arial");
+ctx.font_size(48.0);
+ctx.fill(Color::black());
+
+// Draw single-line text
+ctx.text("Hello World", 100.0, 100.0);
+
+// Draw multi-line text box with word wrapping
+ctx.text_box("Long text that wraps...", 100.0, 200.0, 400.0, 200.0);
+```
+
+### Custom Font Loading
+```rust
+// Load custom fonts from files
+let mut renderer = Renderer::new(800, 600);
+renderer.load_font("fonts/MyFont-Regular.ttf").unwrap();
+renderer.load_font("fonts/MyFont-Bold.ttf").unwrap();
+
+// Use the loaded fonts
+ctx.font("MyFont");
+ctx.text("Custom Font", 100.0, 100.0);
+
+// System fonts still work too
+ctx.font("Arial");
+ctx.text("System Font", 100.0, 200.0);
+```
+
 ### Rendering
 ```rust
 let renderer = Renderer::new(width, height);
@@ -184,11 +214,13 @@ designbot/
 - [x] PNG output
 - [x] Canvas management
 
-✅ **Phase 2 In Progress**: Core drawing API
+✅ **Phase 2 Complete**: Core drawing API
 - [x] Shape primitives (rect, oval, line, polygon)
 - [x] Fill and stroke colors
 - [x] Graphics state stack (save/restore)
 - [x] Basic transformations (translate, rotate, scale)
+- [x] Text rendering with Parley
+- [x] Custom font loading
 - [ ] Path operations (bezier curves)
 
 🔧 **Current Improvements**:
@@ -197,11 +229,11 @@ designbot/
 - Using Kurbo's native Ellipse type for oval rendering
 
 🔜 **Coming Soon**:
-- Text rendering (Parley integration)
 - Gradients
 - Image placement
 - SVG/PDF output
 - Animation support
+- Advanced path operations
 
 See [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for the full roadmap.
 
@@ -226,7 +258,19 @@ cargo fmt --all
 Check out the `examples/` directory for more:
 
 - `basic_shapes.rs` - All primitive shapes (rect, oval, line, polygon)
+- `basic_text.rs` - Text rendering and custom font loading
+- `grid.rs` - Using state transformations for layout
 - More examples coming soon!
+
+### Font Setup for Examples
+
+To run the text examples with custom fonts:
+
+1. Create `examples/fonts/` directory (already exists)
+2. Download fonts (e.g., [Inter](https://rsms.me/inter/)) and place `.ttf` files in the directory
+3. See `examples/fonts/README.md` for detailed setup instructions
+
+The examples will fall back to system fonts if custom fonts aren't found.
 
 ## License
 
