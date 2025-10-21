@@ -15,3 +15,4 @@ designbot-core.workspace = true
 designbot-render.workspace = true
 clap.workspace = true
 anyhow.workspace = true
+dirs.workspace = true

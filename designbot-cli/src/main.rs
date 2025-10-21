@@ -60,13 +60,15 @@ fn render_script(script_path: &str, output_path: &str) -> Result<()> {
 
     println!("Rendering {} -> {}", script_abs.display(), output_abs.display());
 
-    // Create temporary project directory
-    let temp_dir = std::env::temp_dir().join(format!("designbot-{}", std::process::id()));
-    fs::create_dir_all(&temp_dir)
-        .with_context(|| format!("Failed to create temp directory: {}", temp_dir.display()))?;
+    // Use persistent cache directory for faster subsequent runs
+    let cache_dir = if let Some(home) = dirs::home_dir() {
+        home.join(".designbot").join("cache")
+    } else {
+        std::env::temp_dir().join("designbot-cache")
+    };
 
-    // Ensure cleanup on exit
-    let _cleanup = Cleanup { path: temp_dir.clone() };
+    fs::create_dir_all(&cache_dir)
+        .with_context(|| format!("Failed to create cache directory: {}", cache_dir.display()))?;
 
     // Read the user's script
     let user_script = fs::read_to_string(&script_abs)
@@ -82,17 +84,32 @@ fn render_script(script_path: &str, output_path: &str) -> Result<()> {
         user_script
     };
 
-    // Create Cargo project
-    create_temp_project(&temp_dir, &final_script, &output_abs)?;
+    // Create/update Cargo project in cache
+    create_cache_project(&cache_dir, &final_script, &output_abs)?;
 
-    // Compile and run
+    // Get the directory where the user invoked the command
+    let user_cwd = std::env::current_dir()
+        .context("Failed to get current working directory")?;
+
+    // Compile in cache directory, but run from user's directory
     let status = Command::new("cargo")
-        .arg("run")
+        .arg("build")
         .arg("--release")
         .arg("--quiet")
-        .current_dir(&temp_dir)
+        .current_dir(&cache_dir)
         .status()
-        .context("Failed to run cargo")?;
+        .context("Failed to compile")?;
+
+    if !status.success() {
+        anyhow::bail!("Script compilation failed");
+    }
+
+    // Run the compiled binary from the user's working directory
+    let binary_path = cache_dir.join("target").join("release").join("designbot-script");
+    let status = Command::new(&binary_path)
+        .current_dir(&user_cwd)
+        .status()
+        .context("Failed to run compiled script")?;
 
     if !status.success() {
         anyhow::bail!("Script compilation or execution failed");
@@ -135,7 +152,7 @@ fn main() {{
     Ok(wrapper)
 }
 
-fn create_temp_project(temp_dir: &Path, script: &str, _output_path: &Path) -> Result<()> {
+fn create_cache_project(cache_dir: &Path, script: &str, _output_path: &Path) -> Result<()> {
     // Create Cargo.toml - try local paths first, fall back to git
     let cargo_toml = if let (Ok(designbot_path), Ok(render_path)) =
         (get_designbot_path(), get_designbot_render_path()) {
@@ -168,11 +185,11 @@ designbot-render = {{ git = "https://github.com/eliheuer/designbot", branch = "m
         )
     };
 
-    fs::write(temp_dir.join("Cargo.toml"), cargo_toml)
+    fs::write(cache_dir.join("Cargo.toml"), cargo_toml)
         .context("Failed to write Cargo.toml")?;
 
     // Create src directory and main.rs
-    let src_dir = temp_dir.join("src");
+    let src_dir = cache_dir.join("src");
     fs::create_dir_all(&src_dir).context("Failed to create src directory")?;
     fs::write(src_dir.join("main.rs"), script).context("Failed to write main.rs")?;
 
@@ -234,13 +251,3 @@ fn get_designbot_render_path() -> Result<PathBuf> {
     anyhow::bail!("Could not find designbot-render library. Make sure you're running from the workspace or the library is published.")
 }
 
-// Cleanup helper to remove temp directory
-struct Cleanup {
-    path: PathBuf,
-}
-
-impl Drop for Cleanup {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.path);
-    }
-}

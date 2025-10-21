@@ -12,24 +12,40 @@ A Rust-based 2D graphics generation tool inspired by [DrawBot](https://www.drawb
 
 ## Installation
 
-### Install from Git
+### Recommended: Install from Git
+
+This is the easiest way to install and ensures you get the latest version:
 
 ```bash
 cargo install --git https://github.com/eliheuer/designbot designbot-cli
 ```
 
-### Install from Local Source
+### For Development: Install from Local Source
+
+If you're contributing to DesignBot or testing local changes:
 
 ```bash
 # Clone the repository
 git clone https://github.com/eliheuer/designbot
 cd designbot
 
-# Install the CLI
-cargo install --path designbot-cli
+# Install the CLI (will use git dependencies for user scripts)
+cargo install --path designbot-cli --force
 ```
 
-After installation, the `designbot` command will be available in your terminal.
+**Important:** After making local changes, you must push them to GitHub's `main` branch before the installed CLI can use them when compiling user scripts.
+
+After installation, the `designbot` command will be available in your terminal (usually in `~/.cargo/bin/designbot`).
+
+### Performance Notes
+
+**First run:** The CLI will compile dependencies (takes ~1-2 minutes)
+**Subsequent runs:** Uses a persistent cache at `~/.designbot/cache` (~0.5 seconds)
+
+To clear the cache if needed:
+```bash
+rm -rf ~/.designbot/cache
+```
 
 ## Quick Start
 

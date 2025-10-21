@@ -43,6 +43,20 @@ cargo build -p designbot-cli
 cargo run -p designbot-cli -- --render path/to/script.rs --output output.png
 ```
 
+### CLI Performance and Caching
+
+The CLI uses a persistent cache directory at `~/.designbot/cache` to speed up compilation:
+
+- **First run:** ~80 seconds (compiles all dependencies)
+- **Subsequent runs:** ~0.6 seconds (uses cargo's incremental compilation)
+
+The cache directory contains a Cargo project that's reused across all script executions. This provides a 100x+ speedup for repeated use.
+
+To clear the cache:
+```bash
+rm -rf ~/.designbot/cache
+```
+
 ## Architecture
 
 ### Workspace Structure

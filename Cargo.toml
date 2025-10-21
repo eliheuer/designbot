@@ -58,6 +58,7 @@ image = "0.25"
 anyhow = "1.0"
 thiserror = "2.0"
 clap = { version = "4.5", features = ["derive"] }
+dirs = "5.0"
 
 # Core library shared
 designbot-core = { path = "designbot" }
