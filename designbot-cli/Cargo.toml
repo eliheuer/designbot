@@ -16,3 +16,4 @@ designbot-render.workspace = true
 clap.workspace = true
 anyhow.workspace = true
 dirs.workspace = true
+regex.workspace = true

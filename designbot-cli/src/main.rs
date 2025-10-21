@@ -77,11 +77,12 @@ fn render_script(script_path: &str, output_path: &str) -> Result<()> {
     // Determine if script already has output handling
     let needs_wrapper = !user_script.contains("render_to_png");
 
-    // Create wrapper script if needed
+    // Create wrapper script if needed, or replace output path if it exists
     let final_script = if needs_wrapper {
         create_wrapper_script(&user_script, &output_abs)?
     } else {
-        user_script
+        // Replace the output path in the user's render_to_png call
+        replace_output_path(&user_script, &output_abs)?
     };
 
     // Create/update Cargo project in cache
@@ -150,6 +151,25 @@ fn main() {{
     };
 
     Ok(wrapper)
+}
+
+fn replace_output_path(user_script: &str, output_path: &Path) -> Result<String> {
+    // Use regex to replace the output path in render_to_png calls
+    let re = regex::Regex::new(r#"render_to_png\s*\([^,]+,\s*"[^"]*"\)"#)
+        .context("Failed to create regex")?;
+
+    let output_str = output_path.display().to_string().replace('\\', "\\\\");
+    let replacement = format!(r#"render_to_png($1, "{}")"#, output_str);
+
+    // Replace render_to_png calls
+    let re2 = regex::Regex::new(r#"render_to_png\s*\(([^,]+),\s*"[^"]*"\)"#)
+        .context("Failed to create regex")?;
+
+    let result = re2.replace_all(user_script, |caps: &regex::Captures| {
+        format!(r#"render_to_png({}, "{}")"#, &caps[1], output_str)
+    });
+
+    Ok(result.to_string())
 }
 
 fn create_cache_project(cache_dir: &Path, script: &str, _output_path: &Path) -> Result<()> {
