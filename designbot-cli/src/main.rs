@@ -162,8 +162,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-designbot = {{ git = "https://github.com/USER/designbot", branch = "main" }}
-designbot-render = {{ git = "https://github.com/USER/designbot", branch = "main" }}
+designbot = {{ git = "https://github.com/eliheuer/designbot", branch = "main" }}
+designbot-render = {{ git = "https://github.com/eliheuer/designbot", branch = "main" }}
 "#
         )
     };
