@@ -199,18 +199,13 @@ fn main() {{
 }
 
 fn replace_output_path(user_script: &str, output_path: &Path) -> Result<String> {
-    // Use regex to replace the output path in render_to_png calls
-    let re = regex::Regex::new(r#"render_to_png\s*\([^,]+,\s*"[^"]*"\)"#)
-        .context("Failed to create regex")?;
-
     let output_str = output_path.display().to_string().replace('\\', "\\\\");
-    let replacement = format!(r#"render_to_png($1, "{}")"#, output_str);
 
-    // Replace render_to_png calls
-    let re2 = regex::Regex::new(r#"render_to_png\s*\(([^,]+),\s*"[^"]*"\)"#)
+    // Use regex to replace the output path in render_to_png calls
+    let re = regex::Regex::new(r#"render_to_png\s*\(([^,]+),\s*"[^"]*"\)"#)
         .context("Failed to create regex")?;
 
-    let result = re2.replace_all(user_script, |caps: &regex::Captures| {
+    let result = re.replace_all(user_script, |caps: &regex::Captures| {
         format!(r#"render_to_png({}, "{}")"#, &caps[1], output_str)
     });
 
