@@ -114,18 +114,17 @@ fn create_wrapper_script(user_script: &str, output_path: &Path) -> Result<String
         // Wrap user code in a main function
         format!(
             r#"
-use designbot::{{Canvas, Color}};
-use designbot_render::Renderer;
+use designbot::prelude::*;
 
 fn main() {{
-    let mut canvas = Canvas::new(800.0, 600.0);
+    let mut ctx = Canvas::new(800.0, 600.0);
+    let mut renderer = Renderer::new(800, 600);
 
     // User code
     {user_script}
 
     // Render
-    let renderer = Renderer::new(800, 600);
-    renderer.render_to_png(&canvas, "{output}").unwrap();
+    renderer.render_to_png(&ctx, "{output}").unwrap();
 }}
 "#,
             user_script = user_script,

@@ -12,13 +12,24 @@ A Rust-based 2D graphics generation tool inspired by [DrawBot](https://www.drawb
 
 ## Installation
 
-```bash
-# Install from source
-cargo install --path designbot-cli
+### Install from Git
 
-# Or install from git (once published)
-# cargo install --git https://github.com/eliheuer/designbot
+```bash
+cargo install --git https://github.com/eliheuer/designbot designbot-cli
 ```
+
+### Install from Local Source
+
+```bash
+# Clone the repository
+git clone https://github.com/eliheuer/designbot
+cd designbot
+
+# Install the CLI
+cargo install --path designbot-cli
+```
+
+After installation, the `designbot` command will be available in your terminal.
 
 ## Quick Start
 
@@ -27,6 +38,46 @@ cargo install --path designbot-cli
 ```bash
 # Create a simple design script
 designbot --render my_design.rs --output my_design.png
+```
+
+### Testing Fonts
+
+Perfect for type designers testing fonts:
+
+```rust
+// font_test.rs
+use designbot::prelude::*;
+
+fn main() {
+    let mut ctx = Canvas::new(1200.0, 800.0);
+    let mut renderer = Renderer::new(1200, 800);
+
+    // Load your font
+    renderer.load_font("fonts/MyFont-Regular.ttf").unwrap();
+
+    ctx.background(Color::rgb(255, 255, 255));
+    ctx.fill(Color::rgb(0, 0, 0));
+    ctx.font("MyFont");
+
+    // Test different sizes
+    ctx.font_size(72.0);
+    ctx.text("The quick brown fox", 50.0, 100.0);
+
+    ctx.font_size(48.0);
+    ctx.text("jumps over the lazy dog", 50.0, 200.0);
+
+    ctx.font_size(24.0);
+    ctx.text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 50.0, 300.0);
+    ctx.text("abcdefghijklmnopqrstuvwxyz", 50.0, 350.0);
+    ctx.text("0123456789 !@#$%^&*()", 50.0, 400.0);
+
+    renderer.render_to_png(&ctx, "font_test.png").unwrap();
+}
+```
+
+Run with:
+```bash
+designbot --render font_test.rs --output font_test.png
 ```
 
 ### Using Examples (For Development)
