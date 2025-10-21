@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -92,6 +93,41 @@ fn render_script(script_path: &str, output_path: &str) -> Result<()> {
     let user_cwd = std::env::current_dir()
         .context("Failed to get current working directory")?;
 
+    // Check if this is the first run
+    let binary_path = cache_dir.join("target").join("release").join("designbot-script");
+    let is_first_run = !binary_path.exists();
+
+    // Show informative message on first run
+    if is_first_run {
+        println!();
+        println!("First run detected - setting up DesignBot environment...");
+        println!();
+        println!("This will:");
+        println!("  • Download Rust dependencies (~50MB)");
+        println!("  • Compile the rendering engine");
+        println!("  • Create a cache at {}", cache_dir.display());
+        println!();
+        println!("This is a one-time setup (~80 seconds).");
+        println!("Future runs will be instant (<1 second)!");
+        println!();
+    }
+
+    // Create progress spinner during compilation
+    let spinner = if is_first_run {
+        let pb = ProgressBar::new_spinner();
+        pb.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.cyan} {msg}")
+                .unwrap()
+                .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
+        );
+        pb.set_message("Downloading dependencies and compiling...");
+        pb.enable_steady_tick(std::time::Duration::from_millis(100));
+        Some(pb)
+    } else {
+        None
+    };
+
     // Compile in cache directory, but run from user's directory
     let status = Command::new("cargo")
         .arg("build")
@@ -100,6 +136,15 @@ fn render_script(script_path: &str, output_path: &str) -> Result<()> {
         .current_dir(&cache_dir)
         .status()
         .context("Failed to compile")?;
+
+    // Stop the spinner
+    if let Some(spinner) = spinner {
+        spinner.finish_with_message("✓ Setup complete!");
+        println!();
+        println!("Cache created at: {}", cache_dir.display());
+        println!("You can remove this directory anytime to clear the cache.");
+        println!();
+    }
 
     if !status.success() {
         anyhow::bail!("Script compilation failed");

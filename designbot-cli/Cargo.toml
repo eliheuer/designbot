@@ -17,3 +17,4 @@ clap.workspace = true
 anyhow.workspace = true
 dirs.workspace = true
 regex.workspace = true
+indicatif.workspace = true
