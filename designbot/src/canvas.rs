@@ -3,6 +3,29 @@ use crate::state::StateStack;
 use kurbo::{Affine, BezPath, Circle, Ellipse, Line, Point, Rect, Stroke};
 use peniko::Brush;
 
+/// Text alignment options
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TextAlign {
+    /// Left alignment (ignores text direction)
+    Left,
+    /// Center alignment
+    Center,
+    /// Right alignment (ignores text direction)
+    Right,
+    /// Start alignment (left for LTR, right for RTL)
+    Start,
+    /// End alignment (right for LTR, left for RTL)
+    End,
+    /// Justified alignment (except last line)
+    Justified,
+}
+
+impl Default for TextAlign {
+    fn default() -> Self {
+        TextAlign::Left
+    }
+}
+
 /// Drawing command that can be rendered
 #[derive(Debug, Clone)]
 pub enum DrawCommand {
@@ -23,6 +46,7 @@ pub enum DrawCommand {
         y: f64,
         font_family: Option<String>,
         font_size: f64,
+        align: TextAlign,
         brush: Brush,
         transform: Affine,
     },
@@ -34,6 +58,7 @@ pub enum DrawCommand {
         height: f64,
         font_family: Option<String>,
         font_size: f64,
+        align: TextAlign,
         brush: Brush,
         transform: Affine,
     },
@@ -272,6 +297,12 @@ impl Canvas {
         self
     }
 
+    /// Set the text alignment
+    pub fn text_align(&mut self, align: TextAlign) -> &mut Self {
+        self.state.current_mut().text_align = align;
+        self
+    }
+
     /// Draw text at a specific position
     pub fn text(&mut self, text: &str, x: f64, y: f64) -> &mut Self {
         let state = self.state.current();
@@ -283,6 +314,7 @@ impl Canvas {
                 y,
                 font_family: state.font_family.clone(),
                 font_size: state.font_size,
+                align: state.text_align,
                 brush: Brush::Solid(fill_color.to_peniko()),
                 transform: state.transform,
             });
@@ -304,6 +336,7 @@ impl Canvas {
                 height,
                 font_family: state.font_family.clone(),
                 font_size: state.font_size,
+                align: state.text_align,
                 brush: Brush::Solid(fill_color.to_peniko()),
                 transform: state.transform,
             });

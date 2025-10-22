@@ -156,10 +156,11 @@ impl Renderer {
                 y,
                 font_family,
                 font_size,
+                align,
                 brush,
                 transform,
             } => {
-                Self::render_text(painter, text, *x, *y, None, font_family.as_deref(), *font_size, brush, transform, font_cx);
+                Self::render_text(painter, text, *x, *y, None, font_family.as_deref(), *font_size, *align, brush, transform, font_cx);
             }
             DrawCommand::DrawTextBox {
                 text,
@@ -169,10 +170,11 @@ impl Renderer {
                 height,
                 font_family,
                 font_size,
+                align,
                 brush,
                 transform,
             } => {
-                Self::render_text(painter, text, *x, *y, Some((*width, *height)), font_family.as_deref(), *font_size, brush, transform, font_cx);
+                Self::render_text(painter, text, *x, *y, Some((*width, *height)), font_family.as_deref(), *font_size, *align, brush, transform, font_cx);
             }
         }
     }
@@ -275,6 +277,7 @@ impl Renderer {
         bounds: Option<(f64, f64)>, // (width, height) for text_box
         font_family: Option<&str>,
         font_size: f64,
+        align: designbot_core::canvas::TextAlign,
         brush: &peniko::Brush,
         transform: &kurbo::Affine,
         font_cx: &RefCell<FontContext>,
@@ -301,15 +304,44 @@ impl Renderer {
         // Set max width for text_box
         let max_width = bounds.map(|(w, _)| w as f32);
         layout.break_all_lines(max_width);
-        layout.align(max_width, parley::layout::Alignment::Start);
+
+        // Convert our TextAlign to Parley's Alignment
+        // Note: Parley 0.2 has Start, Middle, End, Justified
+        // For LTR text: Start=left, Middle=center, End=right
+        let parley_align = match align {
+            designbot_core::canvas::TextAlign::Left => parley::layout::Alignment::Start,
+            designbot_core::canvas::TextAlign::Center => parley::layout::Alignment::Middle,
+            designbot_core::canvas::TextAlign::Right => parley::layout::Alignment::End,
+            designbot_core::canvas::TextAlign::Start => parley::layout::Alignment::Start,
+            designbot_core::canvas::TextAlign::End => parley::layout::Alignment::End,
+            designbot_core::canvas::TextAlign::Justified => parley::layout::Alignment::Justified,
+        };
+
+        layout.align(max_width, parley_align);
+
+        // For single-line text without a container width, manually adjust x position
+        // based on text width and alignment (like DrawBot)
+        let x_adjustment = if bounds.is_none() {
+            let text_width = layout.width() as f64;
+            match align {
+                designbot_core::canvas::TextAlign::Center => -text_width / 2.0,
+                designbot_core::canvas::TextAlign::Right | designbot_core::canvas::TextAlign::End => -text_width,
+                _ => 0.0, // Left, Start, Justified
+            }
+        } else {
+            0.0 // For text_box, use Parley's alignment offset
+        };
+        let adjusted_x = x + x_adjustment;
 
         // Convert brush to color
         let color = Self::brush_to_color(brush);
 
         // Render each glyph
         for line in layout.lines() {
-            // Get line metrics for proper vertical positioning
-            let line_y = y + line.metrics().baseline as f64;
+            // Get line metrics for proper vertical positioning and alignment offset
+            let line_metrics = line.metrics();
+            let line_y = y + line_metrics.baseline as f64;
+            let line_x_offset = line_metrics.offset as f64; // Horizontal offset for alignment
 
             for item in line.items() {
                 if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
@@ -384,8 +416,8 @@ impl Renderer {
                             }
 
                             // Calculate glyph position
-                            // Use accumulated offset for X position
-                            let glyph_x = x + glyph_x_offset as f64;
+                            // Use adjusted x (for single-line alignment), line alignment offset (for text_box), and glyph offset
+                            let glyph_x = adjusted_x + line_x_offset + glyph_x_offset as f64;
                             let glyph_y = line_y;
 
                             // Font glyphs have Y-up coordinate system, but screen is Y-down

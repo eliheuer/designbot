@@ -1,4 +1,5 @@
 use crate::color::Color;
+use crate::canvas::TextAlign;
 
 /// Graphics state that can be saved and restored
 #[derive(Debug, Clone)]
@@ -9,6 +10,7 @@ pub struct GraphicsState {
     pub transform: kurbo::Affine,
     pub font_family: Option<String>,
     pub font_size: f64,
+    pub text_align: TextAlign,
 }
 
 impl Default for GraphicsState {
@@ -20,6 +22,7 @@ impl Default for GraphicsState {
             transform: kurbo::Affine::IDENTITY,
             font_family: None,
             font_size: 12.0,
+            text_align: TextAlign::default(),
         }
     }
 }

@@ -4,7 +4,6 @@ pub use designbot_render::*;
 
 // Single import prelude for beginners
 pub mod prelude {
-    pub use designbot_core::Canvas;
-    pub use designbot_core::Color;
+    pub use designbot_core::{Canvas, Color, TextAlign};
     pub use designbot_render::Renderer;
 }

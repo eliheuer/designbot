@@ -27,6 +27,10 @@ path = "examples/basic_shapes.rs"
 name = "basic_text"
 path = "examples/basic_text.rs"
 
+[[example]]
+name = "text_alignment"
+path = "examples/text_alignment.rs"
+
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
