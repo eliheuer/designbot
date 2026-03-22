@@ -1,7 +1,7 @@
 use designbot::prelude::*;
 
 fn main() {
-    // Create a 1000x1000 canvas (same size as DrawBot examples)
+    // Create a 1000x1000 canvas
     let mut ctx = Canvas::new(1000.0, 1000.0);
 
     // Set dark gray background

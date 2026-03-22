@@ -8,7 +8,7 @@ use peniko::Brush;
 pub enum TextAlign {
     /// Left alignment (ignores text direction)
     Left,
-    /// Center alignment
+    /// Center alignment (ignores text direction)
     Center,
     /// Right alignment (ignores text direction)
     Right,

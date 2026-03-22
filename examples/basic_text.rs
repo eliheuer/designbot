@@ -14,7 +14,7 @@ fn main() {
     // Note: You need to download fonts and place them in examples/fonts/
     // See examples/fonts/README.md for recommended fonts and instructions
     if let Err(e) = renderer.load_font("fonts/BezyGrotesk-Regular.ttf") {
-        eprintln!("Warning: Could not load Inter-Regular.ttf: {}", e);
+        eprintln!("Warning: Could not load font: {}", e);
         eprintln!("The example will fall back to system fonts.");
         eprintln!("See examples/fonts/README.md for setup instructions.");
     }
