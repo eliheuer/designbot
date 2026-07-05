@@ -16,13 +16,17 @@ struct Args {
     /// Output file path (PNG, PDF, SVG, etc.)
     #[arg(long)]
     output: Option<String>,
+
+    /// Extra arguments forwarded to the compiled script (after --)
+    #[arg(last = true)]
+    script_args: Vec<String>,
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
 
     if let (Some(script_path), Some(output_path)) = (args.render, args.output) {
-        render_script(&script_path, &output_path)?;
+        render_script(&script_path, &output_path, &args.script_args)?;
     } else {
         print_usage();
     }
@@ -41,7 +45,7 @@ fn print_usage() {
     eprintln!("  cargo run --example basic_shapes");
 }
 
-fn render_script(script_path: &str, output_path: &str) -> Result<()> {
+fn render_script(script_path: &str, output_path: &str, script_args: &[String]) -> Result<()> {
     let script_path = Path::new(script_path);
     let output_path = Path::new(output_path);
 
@@ -154,6 +158,7 @@ fn render_script(script_path: &str, output_path: &str) -> Result<()> {
     let binary_path = cache_dir.join("target").join("release").join("designbot-script");
     let status = Command::new(&binary_path)
         .current_dir(&user_cwd)
+        .args(script_args)
         .status()
         .context("Failed to run compiled script")?;
 

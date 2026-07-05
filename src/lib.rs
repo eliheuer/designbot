@@ -2,8 +2,13 @@
 pub use designbot_core::*;
 pub use designbot_render::*;
 
+// Re-export font and curve libraries for use in designbot scripts.
+pub use kurbo;
+pub use norad;
+
 // Single import prelude for beginners
 pub mod prelude {
     pub use designbot_core::{Canvas, Color, TextAlign};
     pub use designbot_render::Renderer;
+    pub use kurbo::BezPath;
 }

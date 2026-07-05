@@ -18,6 +18,8 @@ path = "src/lib.rs"
 [dependencies]
 designbot-core = { path = "designbot" }
 designbot-render = { path = "designbot-render" }
+kurbo.workspace = true
+norad.workspace = true
 
 [[example]]
 name = "basic_shapes"
@@ -57,6 +59,9 @@ color = "0.3"
 # Graphics and rendering
 wgpu = "22"
 image = "0.25"
+
+# Font tooling
+norad = { version = "0.18", features = ["kurbo"] }
 
 # Utilities
 anyhow = "1.0"
