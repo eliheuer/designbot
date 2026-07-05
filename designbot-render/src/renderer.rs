@@ -5,10 +5,11 @@ use kurbo::Shape;
 use color::AlphaColor;
 use peniko::Fill;
 use parley::{FontContext, LayoutContext, layout::PositionedLayoutItem};
-use parley::style::{FontFamily, FontStack, StyleProperty};
+use parley::style::{FontFamily, FontSettings, FontStack, FontVariation, StyleProperty};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::path::Path;
+use std::sync::Arc;
 
 pub struct Renderer {
     width: u32,
@@ -38,6 +39,46 @@ impl Renderer {
             .map_err(|e| DesignBotError::IOError(e))?;
         self.custom_fonts.push(font_data);
         Ok(())
+    }
+
+    /// Measure the advance width, in pixels, of a single line of text with the
+    /// given font/size/axes — the equivalent of DrawBot's `textSize()[0]`. Uses
+    /// the same shaping path as rendering, including any registered custom fonts.
+    pub fn text_width(
+        &self,
+        text: &str,
+        font_family: Option<&str>,
+        font_size: f64,
+        variations: &[(u32, f32)],
+    ) -> f64 {
+        let mut font_cx = FontContext::default();
+        for font_data in &self.custom_fonts {
+            font_cx.collection.register_fonts(font_data.clone());
+        }
+        let mut layout_cx: LayoutContext<[u8; 4]> = LayoutContext::new();
+        let mut builder = layout_cx.ranged_builder(&mut font_cx, text, 1.0);
+
+        if let Some(family) = font_family {
+            let family = FontFamily::Named(Cow::Borrowed(family));
+            builder.push_default(StyleProperty::FontStack(FontStack::Single(family)));
+        }
+        builder.push_default(StyleProperty::FontSize(font_size as f32));
+        if !variations.is_empty() {
+            let settings: Vec<FontVariation> = variations
+                .iter()
+                .map(|(tag, value)| FontVariation {
+                    tag: *tag,
+                    value: *value,
+                })
+                .collect();
+            builder.push_default(StyleProperty::FontVariations(FontSettings::List(
+                Cow::Owned(settings),
+            )));
+        }
+
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.width() as f64
     }
 
     pub fn render_to_png(&self, canvas: &Canvas, output_path: &str) -> Result<(), DesignBotError> {
@@ -157,10 +198,11 @@ impl Renderer {
                 font_family,
                 font_size,
                 align,
+                variations,
                 brush,
                 transform,
             } => {
-                Self::render_text(painter, text, *x, *y, None, font_family.as_deref(), *font_size, *align, brush, transform, font_cx);
+                Self::render_text(painter, text, *x, *y, None, font_family.as_deref(), *font_size, *align, variations, brush, transform, font_cx);
             }
             DrawCommand::DrawTextBox {
                 text,
@@ -171,12 +213,65 @@ impl Renderer {
                 font_family,
                 font_size,
                 align,
+                variations,
                 brush,
                 transform,
             } => {
-                Self::render_text(painter, text, *x, *y, Some((*width, *height)), font_family.as_deref(), *font_size, *align, brush, transform, font_cx);
+                Self::render_text(painter, text, *x, *y, Some((*width, *height)), font_family.as_deref(), *font_size, *align, variations, brush, transform, font_cx);
+            }
+            DrawCommand::DrawImage {
+                data,
+                img_width,
+                img_height,
+                x,
+                y,
+                alpha,
+                transform,
+            } => {
+                Self::render_image(painter, data, *img_width, *img_height, *x, *y, *alpha, transform);
             }
         }
+    }
+
+    /// Draw a raster image (straight-alpha RGBA8) at its natural size under the
+    /// given transform, offset by (x, y), with an extra alpha multiplier.
+    fn render_image(
+        painter: &mut impl PaintScene,
+        data: &Arc<Vec<u8>>,
+        img_width: u32,
+        img_height: u32,
+        x: f64,
+        y: f64,
+        alpha: f32,
+        transform: &kurbo::Affine,
+    ) {
+        use peniko::{Blob, ImageAlphaType, ImageBrush, ImageData, ImageFormat};
+
+        // vello_cpu 0.0.4 does not implement opacity on image draws, so bake the
+        // alpha multiplier into the image's own alpha channel (this matches
+        // DrawBot's `image(..., alpha=)` semantics) and keep the brush opaque.
+        let blob = if alpha >= 1.0 {
+            Blob::new(data.clone())
+        } else {
+            let mut faded = (**data).clone();
+            for pixel in faded.chunks_exact_mut(4) {
+                pixel[3] = (pixel[3] as f32 * alpha).round().clamp(0.0, 255.0) as u8;
+            }
+            Blob::new(Arc::new(faded))
+        };
+
+        let image_data = ImageData {
+            data: blob,
+            format: ImageFormat::Rgba8,
+            alpha_type: ImageAlphaType::Alpha,
+            width: img_width,
+            height: img_height,
+        };
+        let brush = ImageBrush::new(image_data);
+
+        let placement = Self::convert_affine(transform) * kurbo::Affine::translate((x, y));
+        let bounds = kurbo::Rect::new(0.0, 0.0, img_width as f64, img_height as f64);
+        painter.fill(Fill::NonZero, placement, brush.as_ref(), None, &bounds);
     }
 
     /// Convert peniko::Brush to Paint for AnyRender
@@ -278,6 +373,7 @@ impl Renderer {
         font_family: Option<&str>,
         font_size: f64,
         align: designbot_core::canvas::TextAlign,
+        variations: &[(u32, f32)],
         brush: &peniko::Brush,
         transform: &kurbo::Affine,
         font_cx: &RefCell<FontContext>,
@@ -297,6 +393,20 @@ impl Renderer {
 
         // Set font size
         builder.push_default(StyleProperty::FontSize(font_size as f32));
+
+        // Apply variable-font axis settings, if any.
+        if !variations.is_empty() {
+            let settings: Vec<FontVariation> = variations
+                .iter()
+                .map(|(tag, value)| FontVariation {
+                    tag: *tag,
+                    value: *value,
+                })
+                .collect();
+            builder.push_default(StyleProperty::FontVariations(FontSettings::List(
+                Cow::Owned(settings),
+            )));
+        }
 
         // Build the layout
         let mut layout = builder.build(text);

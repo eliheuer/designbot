@@ -2,6 +2,17 @@ use crate::color::Color;
 use crate::state::StateStack;
 use kurbo::{Affine, BezPath, Circle, Ellipse, Line, Point, Rect, Stroke};
 use peniko::Brush;
+use std::sync::Arc;
+
+/// Pack a (up to) 4-character OpenType axis/feature tag into a big-endian u32,
+/// space-padding shorter tags (matching swash's `tag_from_str_lossy`).
+fn pack_tag(tag: &str) -> u32 {
+    let mut bytes = [b' '; 4];
+    for (slot, byte) in bytes.iter_mut().zip(tag.bytes()) {
+        *slot = byte;
+    }
+    u32::from_be_bytes(bytes)
+}
 
 /// Text alignment options
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -47,6 +58,7 @@ pub enum DrawCommand {
         font_family: Option<String>,
         font_size: f64,
         align: TextAlign,
+        variations: Vec<(u32, f32)>,
         brush: Brush,
         transform: Affine,
     },
@@ -59,7 +71,20 @@ pub enum DrawCommand {
         font_family: Option<String>,
         font_size: f64,
         align: TextAlign,
+        variations: Vec<(u32, f32)>,
         brush: Brush,
+        transform: Affine,
+    },
+    /// Draw a raster image (straight-alpha RGBA8) at its natural size, honoring
+    /// the current transform. `x`/`y` offset the image within that transform;
+    /// `alpha` is an extra opacity multiplier.
+    DrawImage {
+        data: Arc<Vec<u8>>,
+        img_width: u32,
+        img_height: u32,
+        x: f64,
+        y: f64,
+        alpha: f32,
         transform: Affine,
     },
 }
@@ -198,6 +223,12 @@ impl Canvas {
         self
     }
 
+    /// Draw a bezier path
+    pub fn draw_path(&mut self, path: BezPath) -> &mut Self {
+        self.draw_shape(ShapeType::Path(path));
+        self
+    }
+
     /// Draw a polygon
     pub fn polygon(&mut self, points: &[(f64, f64)], close: bool) -> &mut Self {
         if points.is_empty() {
@@ -315,6 +346,7 @@ impl Canvas {
                 font_family: state.font_family.clone(),
                 font_size: state.font_size,
                 align: state.text_align,
+                variations: state.font_variations.clone(),
                 brush: Brush::Solid(fill_color.to_peniko()),
                 transform: state.transform,
             });
@@ -337,11 +369,57 @@ impl Canvas {
                 font_family: state.font_family.clone(),
                 font_size: state.font_size,
                 align: state.text_align,
+                variations: state.font_variations.clone(),
                 brush: Brush::Solid(fill_color.to_peniko()),
                 transform: state.transform,
             });
         }
 
+        self
+    }
+
+    /// Set a variable-font axis (e.g. `"wght"`, `700.0`). Repeated calls set
+    /// additional axes; a later call for the same axis overrides the earlier
+    /// value. Applies to subsequent `text`/`text_box` calls.
+    pub fn font_variation(&mut self, axis: &str, value: f32) -> &mut Self {
+        let tag = pack_tag(axis);
+        let variations = &mut self.state.current_mut().font_variations;
+        if let Some(existing) = variations.iter_mut().find(|(t, _)| *t == tag) {
+            existing.1 = value;
+        } else {
+            variations.push((tag, value));
+        }
+        self
+    }
+
+    /// Clear all variable-font axis settings.
+    pub fn clear_font_variations(&mut self) -> &mut Self {
+        self.state.current_mut().font_variations.clear();
+        self
+    }
+
+    /// Draw a raster image from straight-alpha RGBA8 pixels at its natural size,
+    /// honoring the current transform. `data` must be `img_width * img_height * 4`
+    /// bytes; `alpha` is an extra opacity multiplier in `[0, 1]`.
+    pub fn image_rgba(
+        &mut self,
+        data: Vec<u8>,
+        img_width: u32,
+        img_height: u32,
+        x: f64,
+        y: f64,
+        alpha: f32,
+    ) -> &mut Self {
+        let transform = self.state.current().transform;
+        self.commands.push(DrawCommand::DrawImage {
+            data: Arc::new(data),
+            img_width,
+            img_height,
+            x,
+            y,
+            alpha,
+            transform,
+        });
         self
     }
 }
