@@ -258,6 +258,74 @@ impl Renderer {
         Ok(())
     }
 
+    /// Render all pages to a single **vector** PDF — shapes and text (as
+    /// outline paths) stay resolution-independent; one PDF page per canvas
+    /// page (DrawBot's multi-page `saveImage("*.pdf")` document model).
+    pub fn render_to_pdf(&self, canvas: &Canvas, output_path: &str) -> Result<(), DesignBotError> {
+        use pdf_writer::{Pdf, Rect as PdfRect, Ref};
+
+        let mut font_cx = FontContext::default();
+        for font_data in &self.custom_fonts {
+            font_cx.collection.register_fonts(font_data.clone());
+        }
+        let font_cx = RefCell::new(font_cx);
+
+        let mut pages: Vec<designbot_core::canvas::Page> = canvas.finished_pages().to_vec();
+        pages.push(canvas.current_page());
+
+        let catalog_id = Ref::new(1);
+        let pages_id = Ref::new(2);
+        let mut next_id = 3;
+        let mut rendered: Vec<(Ref, Ref, Vec<u8>)> = Vec::new();
+        let mut all_warnings: Vec<&'static str> = Vec::new();
+
+        for page in &pages {
+            let page_id = Ref::new(next_id);
+            let content_id = Ref::new(next_id + 1);
+            next_id += 2;
+
+            let mut painter = crate::pdf::PdfScenePainter::new(self.height as f64);
+            if let Some(bg) = page.background {
+                let rgba = bg.to_peniko().to_rgba8();
+                let paint = Paint::Solid(AlphaColor::from_rgba8(rgba.r, rgba.g, rgba.b, rgba.a));
+                let full =
+                    kurbo::Rect::new(0.0, 0.0, self.width as f64, self.height as f64);
+                painter.fill(Fill::NonZero, kurbo::Affine::IDENTITY, &paint, None, &full);
+            }
+            for command in &page.commands {
+                Self::render_command(&mut painter, command, &font_cx);
+            }
+            let (bytes, warnings) = painter.finish();
+            for w in warnings {
+                if !all_warnings.contains(&w) {
+                    all_warnings.push(w);
+                }
+            }
+            rendered.push((page_id, content_id, bytes));
+        }
+
+        let mut pdf = Pdf::new();
+        pdf.catalog(catalog_id).pages(pages_id);
+        pdf.pages(pages_id)
+            .kids(rendered.iter().map(|(page_id, _, _)| *page_id))
+            .count(rendered.len() as i32);
+        for (page_id, content_id, bytes) in &rendered {
+            {
+                let mut page = pdf.page(*page_id);
+                page.parent(pages_id)
+                    .media_box(PdfRect::new(0.0, 0.0, self.width as f32, self.height as f32))
+                    .contents(*content_id);
+                page.resources();
+            }
+            pdf.stream(*content_id, bytes);
+        }
+        for w in all_warnings {
+            eprintln!("warning: {w}");
+        }
+        std::fs::write(output_path, pdf.finish()).map_err(DesignBotError::IOError)?;
+        Ok(())
+    }
+
     /// Render a single draw command using the PaintScene API
     fn render_command(
         painter: &mut impl PaintScene,

@@ -116,8 +116,12 @@ ImageObject filters — (defer).
 ### Phase D — I/O + formats
 - [ ] `image(path, x, y, alpha)` (decode → image_rgba) + `image_size`
 - [ ] SVG export (kurbo `to_svg()` per command; text as paths first)
-- [ ] PDF export (evaluate `pdf-writer`; revisit Linebender options)
-- [ ] Multi-page PDF = the DrawBot document model completion
+- [x] PDF export — DONE 2026-07-07: **vector** PDF via a `PaintScene`
+      implementation writing PDF content streams (pdf-writer). Shapes, text
+      (as outline paths), clip, full stroke styles; multi-page native; CLI
+      routes `.pdf`. v1 gaps (warn, not fail): gradients→first stop, raster
+      images skipped, layer alpha/blend ignored, shadows unblurred
+- [x] Per-script compile cache (concurrent renders don't clobber; 2026-07-07)
 
 ### Phase E — Ergonomics
 - [ ] hex/hsb color helpers; `random_seed`/`random` helpers

@@ -65,11 +65,22 @@ fn render_script(script_path: &str, output_path: &str, script_args: &[String]) -
 
     println!("Rendering {} -> {}", script_abs.display(), output_abs.display());
 
-    // Use persistent cache directory for faster subsequent runs
+    // Use a persistent per-script cache so subsequent runs are fast and
+    // concurrent renders of different scripts don't clobber each other.
+    let script_key = {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        script_abs.hash(&mut h);
+        let stem = script_abs
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "script".into());
+        format!("{}-{:016x}", stem, h.finish())
+    };
     let cache_dir = if let Some(home) = dirs::home_dir() {
-        home.join(".designbot").join("cache")
+        home.join(".designbot").join("cache").join(&script_key)
     } else {
-        std::env::temp_dir().join("designbot-cache")
+        std::env::temp_dir().join("designbot-cache").join(&script_key)
     };
 
     fs::create_dir_all(&cache_dir)
@@ -183,6 +194,7 @@ fn render_method_for(output_path: &Path) -> &'static str {
     {
         Some("gif") => "render_to_gif",
         Some("mp4") | Some("mov") => "render_to_mp4",
+        Some("pdf") => "render_to_pdf",
         _ => "render_to_png",
     }
 }

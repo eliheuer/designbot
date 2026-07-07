@@ -1,5 +1,7 @@
+mod pdf;
 mod renderer;
 
+pub use pdf::PdfScenePainter;
 pub use renderer::Renderer;
 
 use designbot_core::DesignBotError;
