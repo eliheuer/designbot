@@ -34,6 +34,10 @@ path = "examples/basic_text.rs"
 name = "text_alignment"
 path = "examples/text_alignment.rs"
 
+[[example]]
+name = "animation"
+path = "examples/animation.rs"
+
 [workspace.package]
 version = "0.1.0"
 edition = "2021"

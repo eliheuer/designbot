@@ -80,7 +80,7 @@ fn render_script(script_path: &str, output_path: &str, script_args: &[String]) -
         .with_context(|| format!("Failed to read script: {}", script_abs.display()))?;
 
     // Determine if script already has output handling
-    let needs_wrapper = !user_script.contains("render_to_png");
+    let needs_wrapper = !user_script.contains("render_to_");
 
     // Create wrapper script if needed, or replace output path if it exists
     let final_script = if needs_wrapper {
@@ -171,6 +171,22 @@ fn render_script(script_path: &str, output_path: &str, script_args: &[String]) -
     Ok(())
 }
 
+/// Pick the Renderer method from the output file extension (DrawBot's
+/// saveImage-by-extension behavior): .gif -> animated GIF, .mp4/.mov -> video
+/// via ffmpeg, anything else -> PNG.
+fn render_method_for(output_path: &Path) -> &'static str {
+    match output_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("gif") => "render_to_gif",
+        Some("mp4") | Some("mov") => "render_to_mp4",
+        _ => "render_to_png",
+    }
+}
+
 fn create_wrapper_script(user_script: &str, output_path: &Path) -> Result<String> {
     // Check if user script has a main function
     let has_main = user_script.contains("fn main");
@@ -192,10 +208,11 @@ fn main() {{
     {user_script}
 
     // Render
-    renderer.render_to_png(&ctx, "{output}").unwrap();
+    renderer.{method}(&ctx, "{output}").unwrap();
 }}
 "#,
             user_script = user_script,
+            method = render_method_for(output_path),
             output = output_path.display().to_string().replace('\\', "\\\\")
         )
     };
@@ -206,12 +223,14 @@ fn main() {{
 fn replace_output_path(user_script: &str, output_path: &Path) -> Result<String> {
     let output_str = output_path.display().to_string().replace('\\', "\\\\");
 
-    // Use regex to replace the output path in render_to_png calls
-    let re = regex::Regex::new(r#"render_to_png\s*\(([^,]+),\s*"[^"]*"\)"#)
+    // Retarget the script's render_to_* call to the requested output path AND
+    // format (extension picks the method, DrawBot saveImage-style).
+    let method = render_method_for(output_path);
+    let re = regex::Regex::new(r#"render_to_\w+\s*\(([^,]+),\s*"[^"]*"\)"#)
         .context("Failed to create regex")?;
 
     let result = re.replace_all(user_script, |caps: &regex::Captures| {
-        format!(r#"render_to_png({}, "{}")"#, &caps[1], output_str)
+        format!(r#"{}({}, "{}")"#, method, &caps[1], output_str)
     });
 
     Ok(result.to_string())

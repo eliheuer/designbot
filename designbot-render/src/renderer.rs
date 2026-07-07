@@ -81,60 +81,180 @@ impl Renderer {
         layout.width() as f64
     }
 
-    pub fn render_to_png(&self, canvas: &Canvas, output_path: &str) -> Result<(), DesignBotError> {
-        // Create font context and register custom fonts
+    /// Render every page of the canvas (finished pages + the current one) to
+    /// raw straight-alpha RGBA8 buffers, reusing one renderer and one font
+    /// context across frames. Returns `(pixels, duration_seconds)` per page.
+    pub fn render_frames(&self, canvas: &Canvas) -> Vec<(Vec<u8>, f64)> {
+        // Create font context once and register custom fonts
         let mut font_cx = FontContext::default();
         for font_data in &self.custom_fonts {
             font_cx.collection.register_fonts(font_data.clone());
         }
-
-        // Wrap in RefCell for interior mutability within the closure
         let font_cx = RefCell::new(font_cx);
 
-        // Create AnyRender ImageRenderer with vello_cpu backend
         let mut renderer = VelloCpuImageRenderer::new(self.width, self.height);
 
-        // Render using AnyRender's clean callback API
-        let mut rgba_data = Vec::new();
-        renderer.render_to_vec(
-            |painter| {
-                // Draw background if set
-                if let Some(bg_color) = canvas.background_color() {
-                    let background = kurbo::Rect::new(
-                        0.0,
-                        0.0,
-                        self.width as f64,
-                        self.height as f64,
-                    );
-                    let rgba = bg_color.to_peniko().to_rgba8();
-                    let bg_paint = Paint::Solid(AlphaColor::from_rgba8(rgba.r, rgba.g, rgba.b, rgba.a));
-                    painter.fill(
-                        Fill::NonZero,
-                        kurbo::Affine::IDENTITY,
-                        &bg_paint,
-                        None,
-                        &background,
-                    );
+        let mut pages: Vec<designbot_core::canvas::Page> = canvas.finished_pages().to_vec();
+        pages.push(canvas.current_page());
+
+        let mut frames = Vec::with_capacity(pages.len());
+        for (i, page) in pages.iter().enumerate() {
+            if i > 0 {
+                // render_to_vec does NOT reset the scene between calls.
+                renderer.reset();
+            }
+            let mut rgba_data = Vec::new();
+            renderer.render_to_vec(
+                |painter| {
+                    if let Some(bg_color) = page.background {
+                        let background = kurbo::Rect::new(
+                            0.0,
+                            0.0,
+                            self.width as f64,
+                            self.height as f64,
+                        );
+                        let rgba = bg_color.to_peniko().to_rgba8();
+                        let bg_paint =
+                            Paint::Solid(AlphaColor::from_rgba8(rgba.r, rgba.g, rgba.b, rgba.a));
+                        painter.fill(
+                            Fill::NonZero,
+                            kurbo::Affine::IDENTITY,
+                            &bg_paint,
+                            None,
+                            &background,
+                        );
+                    }
+                    for command in &page.commands {
+                        Self::render_command(painter, command, &font_cx);
+                    }
+                },
+                &mut rgba_data,
+            );
+            let duration = page
+                .duration
+                .unwrap_or(designbot_core::canvas::DEFAULT_FRAME_DURATION);
+            frames.push((rgba_data, duration));
+        }
+        frames
+    }
+
+    /// Render to PNG. A single-page canvas writes exactly `output_path`; a
+    /// multi-page canvas writes numbered siblings (`name_0001.png`, ...).
+    pub fn render_to_png(&self, canvas: &Canvas, output_path: &str) -> Result<(), DesignBotError> {
+        let frames = self.render_frames(canvas);
+        let save = |path: &str, data: &[u8]| {
+            image::save_buffer(path, data, self.width, self.height, image::ColorType::Rgba8)
+                .map_err(|e| {
+                    DesignBotError::IOError(std::io::Error::new(std::io::ErrorKind::Other, e))
+                })
+        };
+        if frames.len() == 1 {
+            save(output_path, &frames[0].0)?;
+        } else {
+            let path = Path::new(output_path);
+            let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+            let parent = path.parent().unwrap_or_else(|| Path::new(""));
+            for (i, (data, _)) in frames.iter().enumerate() {
+                let numbered = parent.join(format!("{}_{:04}.png", stem, i + 1));
+                save(&numbered.to_string_lossy(), data)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Render all pages to an animated GIF, honoring per-page frame durations
+    /// (DrawBot: `newPage` + `frameDuration` + `saveImage("*.gif")`).
+    pub fn render_to_gif(&self, canvas: &Canvas, output_path: &str) -> Result<(), DesignBotError> {
+        use image::codecs::gif::{GifEncoder, Repeat};
+        use image::{Delay, Frame, RgbaImage};
+
+        let frames = self.render_frames(canvas);
+        let file = std::fs::File::create(output_path).map_err(DesignBotError::IOError)?;
+        let mut encoder = GifEncoder::new(file);
+        encoder
+            .set_repeat(Repeat::Infinite)
+            .map_err(|e| DesignBotError::RenderError(format!("gif encoder: {e}")))?;
+        for (data, duration) in frames {
+            let img = RgbaImage::from_raw(self.width, self.height, data)
+                .ok_or_else(|| DesignBotError::RenderError("frame buffer size mismatch".into()))?;
+            let delay =
+                Delay::from_saturating_duration(std::time::Duration::from_secs_f64(duration));
+            encoder
+                .encode_frame(Frame::from_parts(img, 0, 0, delay))
+                .map_err(|e| DesignBotError::RenderError(format!("gif frame: {e}")))?;
+        }
+        Ok(())
+    }
+
+    /// Render all pages to an MP4 by piping raw frames to `ffmpeg` (the same
+    /// approach DrawBot takes). Uses a constant frame rate derived from the
+    /// shortest page duration; longer pages repeat frames. Requires `ffmpeg`
+    /// on PATH.
+    pub fn render_to_mp4(&self, canvas: &Canvas, output_path: &str) -> Result<(), DesignBotError> {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+
+        let frames = self.render_frames(canvas);
+        let shortest = frames
+            .iter()
+            .map(|(_, d)| *d)
+            .fold(f64::INFINITY, f64::min)
+            .max(1.0 / 60.0);
+        let fps = (1.0 / shortest).round().clamp(1.0, 60.0);
+
+        let mut child = Command::new("ffmpeg")
+            .args([
+                "-y",
+                "-f",
+                "rawvideo",
+                "-pixel_format",
+                "rgba",
+                "-video_size",
+                &format!("{}x{}", self.width, self.height),
+                "-framerate",
+                &format!("{fps}"),
+                "-i",
+                "-",
+                "-pix_fmt",
+                "yuv420p",
+                // yuv420p needs even dimensions
+                "-vf",
+                "pad=ceil(iw/2)*2:ceil(ih/2)*2",
+                "-movflags",
+                "+faststart",
+                "-an",
+                output_path,
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| {
+                DesignBotError::RenderError(format!(
+                    "could not launch ffmpeg (required for MP4 export — `brew install ffmpeg`): {e}"
+                ))
+            })?;
+
+        {
+            let stdin = child
+                .stdin
+                .as_mut()
+                .ok_or_else(|| DesignBotError::RenderError("ffmpeg stdin unavailable".into()))?;
+            for (data, duration) in &frames {
+                let repeats = ((duration * fps).round() as usize).max(1);
+                for _ in 0..repeats {
+                    stdin.write_all(data).map_err(DesignBotError::IOError)?;
                 }
+            }
+        }
 
-                // Draw all canvas commands
-                for command in canvas.commands() {
-                    Self::render_command(painter, command, &font_cx);
-                }
-            },
-            &mut rgba_data,
-        );
-
-        // Save to PNG using the image crate
-        image::save_buffer(
-            output_path,
-            &rgba_data,
-            self.width,
-            self.height,
-            image::ColorType::Rgba8,
-        )
-        .map_err(|e| DesignBotError::IOError(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
-
+        let output = child.wait_with_output().map_err(DesignBotError::IOError)?;
+        if !output.status.success() {
+            return Err(DesignBotError::RenderError(format!(
+                "ffmpeg failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )));
+        }
         Ok(())
     }
 
@@ -179,8 +299,8 @@ impl Renderer {
                 // Convert brush to a color that AnyRender understands
                 let color = Self::brush_to_color(brush);
 
-                // Convert stroke to kurbo 0.12
-                let kurbo_stroke = kurbo::Stroke::new(stroke.width);
+                // Pass the full stroke through: caps, join, miter, dashes
+                let kurbo_stroke = stroke.clone();
 
                 // Use AnyRender's stroke method
                 painter.stroke(

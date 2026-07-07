@@ -99,6 +99,19 @@ pub enum ShapeType {
     Path(BezPath),
 }
 
+/// A finished page (or animation frame): its command list, background, and
+/// how long it stays on screen in an animation.
+#[derive(Debug, Clone)]
+pub struct Page {
+    pub commands: Vec<DrawCommand>,
+    pub background: Option<Color>,
+    /// Frame duration in seconds (DrawBot `frameDuration`); None = default.
+    pub duration: Option<f64>,
+}
+
+/// Default animation frame duration in seconds (DrawBot's 1/10 s).
+pub const DEFAULT_FRAME_DURATION: f64 = 0.1;
+
 /// Main canvas for drawing
 pub struct Canvas {
     width: f64,
@@ -106,6 +119,10 @@ pub struct Canvas {
     background_color: Option<Color>,
     state: StateStack,
     commands: Vec<DrawCommand>,
+    /// Pages completed by `new_page()`; the fields above hold the current page.
+    finished_pages: Vec<Page>,
+    /// Frame duration for the current (and subsequent) pages.
+    frame_duration: Option<f64>,
 }
 
 impl Canvas {
@@ -117,6 +134,47 @@ impl Canvas {
             background_color: Some(Color::white()), // Default white background
             state: StateStack::new(),
             commands: Vec::new(),
+            finished_pages: Vec::new(),
+            frame_duration: None,
+        }
+    }
+
+    /// Finish the current page and start a new one (DrawBot `newPage`).
+    /// Graphics state, background color, and frame duration carry over.
+    pub fn new_page(&mut self) -> &mut Self {
+        let commands = std::mem::take(&mut self.commands);
+        self.finished_pages.push(Page {
+            commands,
+            background: self.background_color,
+            duration: self.frame_duration,
+        });
+        self
+    }
+
+    /// Number of pages, counting the current one (DrawBot `pageCount`).
+    pub fn page_count(&self) -> usize {
+        self.finished_pages.len() + 1
+    }
+
+    /// Set the frame duration, in seconds, for the current and subsequent
+    /// pages when exporting an animation (DrawBot `frameDuration`).
+    pub fn frame_duration(&mut self, seconds: f64) -> &mut Self {
+        self.frame_duration = Some(seconds);
+        self
+    }
+
+    /// Pages completed by `new_page()` (not including the current page).
+    pub fn finished_pages(&self) -> &[Page] {
+        &self.finished_pages
+    }
+
+    /// The current (unfinished) page as a `Page` clone — combined with
+    /// `finished_pages()` this is the whole document, in order.
+    pub fn current_page(&self) -> Page {
+        Page {
+            commands: self.commands.clone(),
+            background: self.background_color,
+            duration: self.frame_duration,
         }
     }
 
@@ -176,6 +234,41 @@ impl Canvas {
         self
     }
 
+    /// Set the stroke end-cap style: `"butt"` (default), `"round"`, or
+    /// `"square"` (DrawBot `lineCap`).
+    pub fn line_cap(&mut self, cap: &str) -> &mut Self {
+        self.state.current_mut().line_cap = match cap {
+            "round" => kurbo::Cap::Round,
+            "square" => kurbo::Cap::Square,
+            _ => kurbo::Cap::Butt,
+        };
+        self
+    }
+
+    /// Set the stroke join style: `"miter"` (default), `"round"`, or
+    /// `"bevel"` (DrawBot `lineJoin`).
+    pub fn line_join(&mut self, join: &str) -> &mut Self {
+        self.state.current_mut().line_join = match join {
+            "round" => kurbo::Join::Round,
+            "bevel" => kurbo::Join::Bevel,
+            _ => kurbo::Join::Miter,
+        };
+        self
+    }
+
+    /// Set the miter limit (DrawBot `miterLimit`).
+    pub fn miter_limit(&mut self, limit: f64) -> &mut Self {
+        self.state.current_mut().miter_limit = limit;
+        self
+    }
+
+    /// Set a dash pattern as on/off lengths, e.g. `&[8.0, 4.0]`; an empty
+    /// slice restores a solid line (DrawBot `lineDash`).
+    pub fn line_dash(&mut self, pattern: &[f64]) -> &mut Self {
+        self.state.current_mut().dash_pattern = pattern.to_vec();
+        self
+    }
+
     /// Draw a rectangle
     pub fn rect(&mut self, x: f64, y: f64, width: f64, height: f64) -> &mut Self {
         let rect = Rect::new(x, y, x + width, y + height);
@@ -215,7 +308,7 @@ impl Canvas {
             self.commands.push(DrawCommand::StrokeShape {
                 shape: ShapeType::Line(line),
                 brush: Brush::Solid(stroke_color.to_peniko()),
-                stroke: Stroke::new(state.stroke_width),
+                stroke: state.make_stroke(),
                 transform: state.transform,
             });
         }
@@ -268,7 +361,7 @@ impl Canvas {
             self.commands.push(DrawCommand::StrokeShape {
                 shape,
                 brush: Brush::Solid(stroke_color.to_peniko()),
-                stroke: Stroke::new(state.stroke_width),
+                stroke: state.make_stroke(),
                 transform: state.transform,
             });
         }
@@ -457,5 +550,43 @@ mod tests {
             canvas.state.current().fill_color,
             Some(Color::rgb(255, 0, 0))
         );
+    }
+
+    #[test]
+    fn test_pages() {
+        let mut canvas = Canvas::new(100.0, 100.0);
+        assert_eq!(canvas.page_count(), 1);
+
+        canvas.rect(0.0, 0.0, 10.0, 10.0);
+        canvas.frame_duration(0.05);
+        canvas.new_page();
+
+        // Current page is fresh; the finished page kept its commands.
+        assert_eq!(canvas.page_count(), 2);
+        assert!(canvas.commands().is_empty());
+        assert_eq!(canvas.finished_pages().len(), 1);
+        assert_eq!(canvas.finished_pages()[0].commands.len(), 1);
+        assert_eq!(canvas.finished_pages()[0].duration, Some(0.05));
+
+        // Frame duration persists onto the next page.
+        canvas.rect(0.0, 0.0, 10.0, 10.0);
+        assert_eq!(canvas.current_page().duration, Some(0.05));
+        assert_eq!(canvas.current_page().commands.len(), 1);
+    }
+
+    #[test]
+    fn test_stroke_style_state() {
+        let mut canvas = Canvas::new(100.0, 100.0);
+        canvas
+            .stroke(Color::black())
+            .stroke_width(4.0)
+            .line_cap("round")
+            .line_join("bevel")
+            .line_dash(&[8.0, 4.0]);
+        let stroke = canvas.state.current().make_stroke();
+        assert_eq!(stroke.width, 4.0);
+        assert_eq!(stroke.start_cap, kurbo::Cap::Round);
+        assert_eq!(stroke.join, kurbo::Join::Bevel);
+        assert_eq!(stroke.dash_pattern.as_slice(), &[8.0, 4.0]);
     }
 }
