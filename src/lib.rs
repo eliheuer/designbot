@@ -2,7 +2,8 @@
 pub use designbot_core::*;
 pub use designbot_render::*;
 
-// Re-export font and curve libraries for use in designbot scripts.
+// Re-export font, curve, and image libraries for use in designbot scripts.
+pub use image;
 pub use kurbo;
 pub use norad;
 

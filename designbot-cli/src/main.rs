@@ -269,7 +269,11 @@ fn get_designbot_path() -> Result<PathBuf> {
     // Try multiple locations
     let current_dir = PathBuf::from(".");
     let parent_dir = PathBuf::from("..");
+    // Workspace root baked in at compile time, so installed binaries
+    // (cargo install --path) find their source checkout from any cwd.
+    let manifest_workspace = Path::new(env!("CARGO_MANIFEST_DIR")).parent();
     let candidates = vec![
+        manifest_workspace,
         // When running from cargo in workspace (target/debug or target/release) - go up to workspace root
         exe_dir.parent().and_then(|p| p.parent()),
         // When running from current directory
@@ -299,7 +303,9 @@ fn get_designbot_render_path() -> Result<PathBuf> {
     let exe_path = std::env::current_exe()?;
     let exe_dir = exe_path.parent().context("Failed to get exe directory")?;
 
+    let manifest_workspace = Path::new(env!("CARGO_MANIFEST_DIR")).parent();
     let candidates = vec![
+        manifest_workspace.map(|p| p.join("designbot-render")),
         exe_dir.parent().and_then(|p| p.parent()).map(|p| p.join("designbot-render")),
         Some(PathBuf::from("designbot-render")),
         Some(PathBuf::from("../designbot-render")),

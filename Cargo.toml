@@ -20,6 +20,7 @@ designbot-core = { path = "designbot" }
 designbot-render = { path = "designbot-render" }
 kurbo.workspace = true
 norad.workspace = true
+image.workspace = true
 
 [[example]]
 name = "basic_shapes"

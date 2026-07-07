@@ -575,6 +575,7 @@ version = "0.1.0"
 dependencies = [
  "designbot-core",
  "designbot-render",
+ "image",
  "kurbo 0.12.0",
  "norad",
 ]
