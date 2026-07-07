@@ -598,6 +598,10 @@ impl Renderer {
                         let mut scaler = scaler_ctx.builder(swash_font_ref)
                             .size(font_size as f32)
                             .hint(true)
+                            // Apply the run's variable-font axis coordinates so
+                            // outlines match the shaped/spaced instance — without
+                            // this, variations affect metrics but not the ink.
+                            .normalized_coords(run.normalized_coords().iter().copied())
                             .build();
 
                         if let Some(outline) = scaler.scale_outline(glyph.id) {

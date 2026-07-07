@@ -57,7 +57,11 @@ management out of scope for now) · hex/hsb color helpers ❌ (tiny).
 **Transformations**: save/restore ✅ · translate/rotate/scale ✅ · skew ❌ ·
 transform(6-tuple affine) ❌ (kurbo::Affine, trivial).
 
-**Text**: font/fontSize ✅ · text/textBox ✅ · align ✅ · fontVariations ✅ ·
+**Text**: font/fontSize ✅ · text/textBox ✅ · align ✅ · fontVariations ✅
+(fixed 2026-07-07: normalized coords now reach the swash scaler, so
+variations apply to OUTLINES, not just shaping/metrics) ·
+listFontVariations ❌ · listNamedInstances ❌ (swash exposes both:
+`FontRef::variations()` / `::instances()`) ·
 textSize ❌ on Canvas (width-only exists on Renderer) · lineHeight ❌ ·
 tracking ❌ · openTypeFeatures ❌ (all three are parley `StyleProperty`s,
 just not wired) · FormattedString ❌ (parley ranged styles exist; needs API
@@ -102,6 +106,8 @@ ImageObject filters — (defer).
 
 ### Phase C — Text parity
 - [ ] `text_size()` on Canvas returning (w, h); fix Renderer width-only
+- [ ] `list_font_variations()` / `list_named_instances()` (axis + instance
+      discovery via swash) and a named-instance setter
 - [ ] `line_height`, `tracking`, `open_type_features` (parley StyleProperties)
 - [ ] Switch glyph drawing to anyrender `draw_glyphs` (hinting, stroked text,
       COLR; kills the per-glyph `ScaleContext` rebuild)
