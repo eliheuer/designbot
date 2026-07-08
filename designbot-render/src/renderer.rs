@@ -30,7 +30,7 @@ impl Renderer {
     ///
     /// # Example
     /// ```no_run
-    /// use designbot::Renderer;
+    /// use designbot_render::Renderer;
     /// let mut renderer = Renderer::new(800, 600);
     /// renderer.load_font("fonts/MyFont.ttf").unwrap();
     /// ```
