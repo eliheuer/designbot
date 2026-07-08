@@ -24,3 +24,4 @@ thiserror.workspace = true
 pollster = "0.4"
 futures-intrusive = "0.5"
 pdf-writer = "0.15.0"
+flate2 = "1.1.9"

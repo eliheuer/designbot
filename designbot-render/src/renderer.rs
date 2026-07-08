@@ -317,7 +317,19 @@ impl Renderer {
                     .contents(*content_id);
                 page.resources();
             }
-            pdf.stream(*content_id, bytes);
+            // Outline-heavy content streams compress ~10x; PDF FlateDecode
+            // is the zlib format.
+            let compressed = {
+                use std::io::Write;
+                let mut enc = flate2::write::ZlibEncoder::new(
+                    Vec::new(),
+                    flate2::Compression::default(),
+                );
+                enc.write_all(bytes).map_err(DesignBotError::IOError)?;
+                enc.finish().map_err(DesignBotError::IOError)?
+            };
+            pdf.stream(*content_id, &compressed)
+                .filter(pdf_writer::Filter::FlateDecode);
         }
         for w in all_warnings {
             eprintln!("warning: {w}");

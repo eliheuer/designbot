@@ -105,7 +105,20 @@ ImageObject filters — (defer).
       path shadow via blurred layer later)
 
 ### Phase C — Text parity
-- [ ] `text_size()` on Canvas returning (w, h); fix Renderer width-only
+
+Gaps confirmed in production by the virtua-grotesk proof port (2026-07-07),
+which had to parse SFNT tables by hand and reverse-engineer parley's
+baseline rounding — fixing these removes that fragility for every port:
+
+- [ ] **Baseline-anchored `text()`** (or a documented baseline-offset
+      accessor) — designbot y is top-of-line; drawbot ports need baselines
+- [ ] `text_size()` on Canvas returning (w, h); fix Renderer width-only —
+      and CACHE the FontContext (rebuilding per call is too slow for
+      per-glyph loops)
+- [ ] `line_height` / leading control (parley uses 1.0×size; drawbot uses
+      the font default ~1.29×) — caused visible paragraph divergence
+- [ ] Font metadata access: family name(s), cmap coverage, hhea metrics —
+      scripts currently parse SFNT themselves
 - [ ] `list_font_variations()` / `list_named_instances()` (axis + instance
       discovery via swash) and a named-instance setter
 - [ ] `line_height`, `tracking`, `open_type_features` (parley StyleProperties)
@@ -121,6 +134,9 @@ ImageObject filters — (defer).
       (as outline paths), clip, full stroke styles; multi-page native; CLI
       routes `.pdf`. v1 gaps (warn, not fail): gradients→first stop, raster
       images skipped, layer alpha/blend ignored, shadows unblurred
+- [x] FlateDecode compression of PDF content streams (2026-07-08; ~10×)
+- [ ] PDF font embedding + text operators (instead of flattened outlines) —
+      the remaining file-size gap vs skia PDFs (proof 811KB vs 90KB)
 - [x] Per-script compile cache (concurrent renders don't clobber; 2026-07-07)
 
 ### Phase E — Ergonomics
