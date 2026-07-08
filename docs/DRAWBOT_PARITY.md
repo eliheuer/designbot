@@ -123,7 +123,12 @@ baseline rounding — fixing these removes that fragility for every port:
       discovery via swash) and a named-instance setter
 - [ ] `line_height`, `tracking`, `open_type_features` (parley StyleProperties)
 - [ ] Switch glyph drawing to anyrender `draw_glyphs` (hinting, stroked text,
-      COLR; kills the per-glyph `ScaleContext` rebuild)
+      COLR; kills the per-glyph `ScaleContext` rebuild). Also fixes two
+      CORRECTNESS bugs found by the virtua-grotesk specimen port (2026-07-08):
+      (a) glyph runs within a line all start at x=0 — the renderer drops each
+      run's line offset, so multi-run lines (bidi, font fallback) collapse
+      into overlap; (b) per-glyph x/y offsets are ignored — GPOS mark
+      attachment is lost (Arabic marks)
 - [ ] FormattedString-style ranged styling API (parley ranged_builder)
 
 ### Phase D — I/O + formats
