@@ -338,6 +338,47 @@ impl Renderer {
         Ok(())
     }
 
+    /// Render the canvas to a single-page SVG document. SVG has no multi-page
+    /// concept, so an animated (multi-page) canvas emits only its last page
+    /// with a warning; a static canvas emits its one page as true vectors.
+    pub fn render_to_svg(
+        &self,
+        canvas: &Canvas,
+        output_path: &str,
+    ) -> Result<(), DesignBotError> {
+        let mut font_cx = FontContext::default();
+        for font_data in &self.custom_fonts {
+            font_cx.collection.register_fonts(font_data.clone());
+        }
+        let font_cx = RefCell::new(font_cx);
+
+        if !canvas.finished_pages().is_empty() {
+            eprintln!(
+                "warning: svg is single-page; emitting the last page only"
+            );
+        }
+        let page = canvas.current_page();
+
+        let mut painter =
+            crate::svg::SvgScenePainter::new(self.width as f64, self.height as f64);
+        if let Some(bg) = page.background {
+            let rgba = bg.to_peniko().to_rgba8();
+            let paint =
+                Paint::Solid(AlphaColor::from_rgba8(rgba.r, rgba.g, rgba.b, rgba.a));
+            let full = kurbo::Rect::new(0.0, 0.0, self.width as f64, self.height as f64);
+            painter.fill(Fill::NonZero, kurbo::Affine::IDENTITY, &paint, None, &full);
+        }
+        for command in &page.commands {
+            Self::render_command(&mut painter, command, &font_cx);
+        }
+        let (bytes, warnings) = painter.finish();
+        for w in warnings {
+            eprintln!("warning: {w}");
+        }
+        std::fs::write(output_path, bytes).map_err(DesignBotError::IOError)?;
+        Ok(())
+    }
+
     /// Render a single draw command using the PaintScene API
     fn render_command(
         painter: &mut impl PaintScene,

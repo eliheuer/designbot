@@ -8,7 +8,8 @@ A Rust-based 2D graphics generation tool inspired by [DrawBot](https://www.drawb
 
 - 🎨 **DrawBot-inspired API** - Familiar drawing primitives (rect, oval, line, polygon, etc)
 - 🎯 **Self-contained** - Zero system dependencies
-- 📦 **Multiple output formats** - PNG (more coming: SVG, PDF, GIF, MP4)
+- 📦 **Multiple output formats** - PNG, GIF, MP4, PDF, and SVG
+- 🎬 **Animation** - Multi-page timelines exported to GIF or MP4
 
 ## Installation
 
@@ -298,8 +299,6 @@ designbot/
 🔜 **Coming Soon**:
 - Gradients
 - Image placement
-- SVG/PDF output
-- Animation support
 - Advanced path operations
 
 See [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for the full roadmap.

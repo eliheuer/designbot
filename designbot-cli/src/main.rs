@@ -184,7 +184,7 @@ fn render_script(script_path: &str, output_path: &str, script_args: &[String]) -
 
 /// Pick the Renderer method from the output file extension (DrawBot's
 /// saveImage-by-extension behavior): .gif -> animated GIF, .mp4/.mov -> video
-/// via ffmpeg, anything else -> PNG.
+/// via ffmpeg, .pdf -> vector PDF, .svg -> vector SVG, anything else -> PNG.
 fn render_method_for(output_path: &Path) -> &'static str {
     match output_path
         .extension()
@@ -195,6 +195,7 @@ fn render_method_for(output_path: &Path) -> &'static str {
         Some("gif") => "render_to_gif",
         Some("mp4") | Some("mov") => "render_to_mp4",
         Some("pdf") => "render_to_pdf",
+        Some("svg") => "render_to_svg",
         _ => "render_to_png",
     }
 }
