@@ -162,12 +162,23 @@ impl Renderer {
         Ok(())
     }
 
-    /// Render to a PNG optimized for posting on social media. Two changes
-    /// versus `render_to_png`: the file carries an explicit sRGB chunk
-    /// (platforms strip ICC profiles and assume sRGB, so tagging removes the
-    /// ambiguity that washes out colors), and the top-left pixel is knocked
-    /// to 99% alpha, which makes X/Twitter keep the upload as lossless PNG
-    /// instead of re-encoding it to JPEG and smearing fine linework.
+    /// Render to a PNG optimized for posting on social media, compensating
+    /// for what platform pipelines do to images:
+    ///
+    /// - An explicit sRGB chunk: platforms strip ICC profiles and assume
+    ///   sRGB, so tagging removes the ambiguity that washes out colors.
+    /// - Saturation pre-compensation (+12% toward/away from Rec. 709 luma):
+    ///   JPEG re-encodes use 4:2:0 chroma subsampling, which halves color
+    ///   resolution and visibly desaturates fine colored detail on flat
+    ///   backgrounds; boosting chroma up front lands the result near the
+    ///   original.
+    /// - Coarse film-style grain (2x2 clusters, +/-3 levels, luminance
+    ///   only, deterministic): masks banding and block artifacts on dark
+    ///   flats and forces encoders to spend bits evenly. Coarse grain
+    ///   survives compression; single-pixel noise gets wiped and wasted.
+    /// - The top-left pixel knocked to 99% alpha, which makes X/Twitter
+    ///   keep the upload as lossless PNG instead of JPEG.
+    ///
     /// Single-image export: a multi-page canvas emits its last page with a
     /// warning, like SVG.
     pub fn render_to_png_social(
@@ -182,6 +193,32 @@ impl Renderer {
         let (mut data, _) = frames
             .pop()
             .ok_or_else(|| DesignBotError::RenderError("no frames to render".into()))?;
+
+        // saturation pre-compensation for 4:2:0 chroma subsampling
+        const SAT: f32 = 1.12;
+        for px in data.chunks_exact_mut(4) {
+            let (r, g, b) = (px[0] as f32, px[1] as f32, px[2] as f32);
+            let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            px[0] = (luma + (r - luma) * SAT).clamp(0.0, 255.0) as u8;
+            px[1] = (luma + (g - luma) * SAT).clamp(0.0, 255.0) as u8;
+            px[2] = (luma + (b - luma) * SAT).clamp(0.0, 255.0) as u8;
+        }
+
+        // coarse, deterministic luminance grain: one value per 2x2 cluster
+        const GRAIN: i32 = 3;
+        let w = self.width as usize;
+        for (i, px) in data.chunks_exact_mut(4).enumerate() {
+            let (cx, cy) = ((i % w) / 2, (i / w) / 2);
+            let mut h = (cx as u32).wrapping_mul(0x9E37_79B9) ^ (cy as u32).wrapping_mul(0x85EB_CA6B);
+            h ^= h >> 16;
+            h = h.wrapping_mul(0x2545_F491);
+            h ^= h >> 13;
+            let n = (h % (2 * GRAIN as u32 + 1)) as i32 - GRAIN;
+            px[0] = (px[0] as i32 + n).clamp(0, 255) as u8;
+            px[1] = (px[1] as i32 + n).clamp(0, 255) as u8;
+            px[2] = (px[2] as i32 + n).clamp(0, 255) as u8;
+        }
+
         if data.len() >= 4 {
             data[3] = 253; // ~99% alpha on one pixel: forces PNG passthrough
         }
