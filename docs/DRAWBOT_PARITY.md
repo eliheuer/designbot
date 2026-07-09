@@ -151,8 +151,10 @@ baseline rounding — fixing these removes that fragility for every port:
 
 ## Compatibility notes
 
-- designbot is **y-down, origin top-left** (Processing-style); DrawBot is
-  y-up bottom-left. This is a deliberate divergence — document it in the
-  cheatsheet rather than emulate.
+- designbot matches DrawBot's coordinate system: **y-up, origin
+  bottom-left**, `rect`/`oval`/`image` anchored at the bottom-left corner,
+  `text()` anchored at the first baseline, positive `rotate()`
+  counterclockwise. (Early versions were y-down top-left; that divergence
+  was removed.)
 - Rust scripts, not Python: the API mirrors DrawBot *semantics*, not its
   dynamic typing (e.g. `fill(None)` → `no_fill()`).

@@ -189,13 +189,13 @@ Text rendering uses Parley for layout and Swash for glyph outline extraction:
 1. **Layout**: Parley breaks text into lines, positions glyphs, handles font fallback
 2. **Glyph outlines**: Swash scales font outlines to requested size
 3. **Path conversion**: Swash paths (MoveTo, LineTo, QuadTo, CurveTo) → Kurbo BezPath
-4. **Coordinate system**: Glyphs are Y-up, screen is Y-down, so apply `Affine::FLIP_Y`
+4. **Coordinate system**: Glyphs are Y-up like user space; the single y-flip into device space is already baked into every command transform by `Canvas::new`, so glyphs are placed without a flip of their own
 
 ### Text API
 
 Two text functions:
-- `text(text, x, y)` - Single-line text at position
-- `text_box(text, x, y, width, height)` - Multi-line text with word wrapping
+- `text(text, x, y)` - Text with the first line's baseline at (x, y), like DrawBot
+- `text_box(text, x, y, width, height)` - Word-wrapped text in a box anchored at its bottom-left corner, filling from the top of the box down
 
 ### Font Loading
 
@@ -236,10 +236,14 @@ ctx.text("Custom Font", 100.0, 100.0);
 
 ### Coordinate System
 
-- Origin (0, 0) is top-left
+DrawBot's, exactly:
+
+- Origin (0, 0) is the bottom-left corner
 - X increases to the right
-- Y increases downward
-- Transformations (translate, rotate, scale) apply to subsequent drawing commands
+- Y increases upward
+- `rect`/`oval`/`image` anchor at their bottom-left corner; `text` anchors at the baseline
+- Implemented by seeding the graphics state with a y-flip (`[1, 0, 0, -1, 0, height]`) in `Canvas::new`; renderers consume y-down device coordinates and are unaware of the convention
+- Transformations (translate, rotate, scale) apply to subsequent drawing commands; positive `rotate()` is counterclockwise on screen
 - All angles are in degrees (converted to radians internally)
 
 ## Examples Setup

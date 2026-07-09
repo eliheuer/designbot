@@ -25,8 +25,10 @@ pub struct PdfScenePainter {
 impl PdfScenePainter {
     pub fn new(height: f64) -> Self {
         let mut content = Content::new();
-        // designbot is y-down top-left; PDF is y-up bottom-left. One global
-        // flip up front lets every command use canvas coordinates directly.
+        // Draw commands arrive in y-down top-left device space (the canvas
+        // bakes the y-up user-space flip into every command transform); PDF
+        // is y-up bottom-left. One global flip up front lets every command
+        // use device coordinates directly.
         content.transform([1.0, 0.0, 0.0, -1.0, 0.0, height as f32]);
         Self {
             content,

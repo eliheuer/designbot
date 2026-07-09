@@ -510,7 +510,12 @@ impl Renderer {
         };
         let brush = ImageBrush::new(image_data);
 
-        let placement = Self::convert_affine(transform) * kurbo::Affine::translate((x, y));
+        // Anchor the image's bottom-left corner at (x, y) in DrawBot user
+        // space. The local FLIP_Y pairs with the flip already inside the
+        // command transform, so raster rows keep their orientation.
+        let placement = Self::convert_affine(transform)
+            * kurbo::Affine::translate((x, y + img_height as f64))
+            * kurbo::Affine::FLIP_Y;
         let bounds = kurbo::Rect::new(0.0, 0.0, img_width as f64, img_height as f64);
         painter.fill(Fill::NonZero, placement, brush.as_ref(), None, &bounds);
     }
@@ -687,11 +692,27 @@ impl Renderer {
         // Convert brush to color
         let color = Self::brush_to_color(brush);
 
+        // Vertical anchoring in DrawBot user space (y-up): text() puts the
+        // FIRST baseline at y and stacks later lines downward; text_box()
+        // fills downward from the top edge of a box whose bottom-left is at
+        // (x, y). Parley's line baselines are measured y-down from the layout
+        // top, so convert them into user-space baselines.
+        let first_baseline = layout
+            .lines()
+            .next()
+            .map(|l| l.metrics().baseline as f64)
+            .unwrap_or(0.0);
+
         // Render each glyph
         for line in layout.lines() {
             // Get line metrics for proper vertical positioning and alignment offset
             let line_metrics = line.metrics();
-            let line_y = y + line_metrics.baseline as f64;
+            let line_y = match bounds {
+                // text_box: first baseline hangs below the box top (y + h)
+                Some((_, h)) => y + h - line_metrics.baseline as f64,
+                // text: first baseline exactly at y
+                None => y - (line_metrics.baseline as f64 - first_baseline),
+            };
             let line_x_offset = line_metrics.offset as f64; // Horizontal offset for alignment
 
             for item in line.items() {
@@ -775,11 +796,12 @@ impl Renderer {
                             let glyph_x = adjusted_x + line_x_offset + glyph_x_offset as f64;
                             let glyph_y = line_y;
 
-                            // Font glyphs have Y-up coordinate system, but screen is Y-down
-                            // We need to flip Y and position the glyph
+                            // Font glyphs are y-up, exactly like DrawBot user
+                            // space; the command transform already carries the
+                            // single flip into device space, so glyphs are
+                            // placed without one of their own.
                             // Note: swash already scaled the outline to font_size
-                            let glyph_transform = kurbo::Affine::translate((glyph_x, glyph_y))
-                                * kurbo::Affine::FLIP_Y;
+                            let glyph_transform = kurbo::Affine::translate((glyph_x, glyph_y));
                             let final_transform = Self::convert_affine(transform) * glyph_transform;
 
                             // Fill the glyph

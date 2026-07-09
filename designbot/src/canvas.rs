@@ -112,7 +112,14 @@ pub struct Page {
 /// Default animation frame duration in seconds (DrawBot's 1/10 s).
 pub const DEFAULT_FRAME_DURATION: f64 = 0.1;
 
-/// Main canvas for drawing
+/// Main canvas for drawing.
+///
+/// Coordinates are DrawBot's: the origin is the **bottom-left** corner and y
+/// increases **upward**. This is implemented by seeding the graphics state
+/// with a y-flip transform (`[1, 0, 0, -1, 0, height]`), so every command's
+/// stored transform maps user space to the y-down device space the renderers
+/// consume; user `translate`/`rotate`/`scale` calls compose on top of it,
+/// which also makes positive `rotate()` counterclockwise, like DrawBot.
 pub struct Canvas {
     width: f64,
     height: f64,
@@ -128,11 +135,16 @@ pub struct Canvas {
 impl Canvas {
     /// Create a new canvas with the given dimensions
     pub fn new(width: f64, height: f64) -> Self {
+        let mut state = StateStack::new();
+        // DrawBot user space (y-up, origin bottom-left) -> device space
+        // (y-down, origin top-left). Lives at the bottom of the state stack,
+        // which restore() never pops.
+        state.current_mut().transform = Affine::new([1.0, 0.0, 0.0, -1.0, 0.0, height]);
         Self {
             width,
             height,
             background_color: Some(Color::white()), // Default white background
-            state: StateStack::new(),
+            state,
             commands: Vec::new(),
             finished_pages: Vec::new(),
             frame_duration: None,
@@ -269,14 +281,15 @@ impl Canvas {
         self
     }
 
-    /// Draw a rectangle
+    /// Draw a rectangle anchored at its bottom-left corner (DrawBot `rect`).
     pub fn rect(&mut self, x: f64, y: f64, width: f64, height: f64) -> &mut Self {
         let rect = Rect::new(x, y, x + width, y + height);
         self.draw_shape(ShapeType::Rect(rect));
         self
     }
 
-    /// Draw an oval (ellipse)
+    /// Draw an oval (ellipse) inside the rect anchored at its bottom-left
+    /// corner (DrawBot `oval`).
     pub fn oval(&mut self, x: f64, y: f64, width: f64, height: f64) -> &mut Self {
         // Calculate center and radii
         let center_x = x + width / 2.0;
@@ -427,7 +440,8 @@ impl Canvas {
         self
     }
 
-    /// Draw text at a specific position
+    /// Draw text with the first line's **baseline** at (x, y), like DrawBot's
+    /// `text()`. Subsequent lines of a multi-line string stack downward.
     pub fn text(&mut self, text: &str, x: f64, y: f64) -> &mut Self {
         let state = self.state.current();
 
@@ -448,7 +462,9 @@ impl Canvas {
         self
     }
 
-    /// Draw text within a bounding box with word wrapping
+    /// Draw text with word wrapping inside a box anchored at its
+    /// bottom-left corner; text fills from the top of the box down
+    /// (DrawBot `textBox`).
     pub fn text_box(&mut self, text: &str, x: f64, y: f64, width: f64, height: f64) -> &mut Self {
         let state = self.state.current();
 
@@ -491,8 +507,9 @@ impl Canvas {
         self
     }
 
-    /// Draw a raster image from straight-alpha RGBA8 pixels at its natural size,
-    /// honoring the current transform. `data` must be `img_width * img_height * 4`
+    /// Draw a raster image from straight-alpha RGBA8 pixels at its natural
+    /// size, anchored at its bottom-left corner (DrawBot `image`) and honoring
+    /// the current transform. `data` must be `img_width * img_height * 4`
     /// bytes; `alpha` is an extra opacity multiplier in `[0, 1]`.
     pub fn image_rgba(
         &mut self,

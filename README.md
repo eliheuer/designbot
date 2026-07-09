@@ -76,17 +76,18 @@ fn main() {
     ctx.fill(Color::rgb(0, 0, 0));
     ctx.font("MyFont");
 
-    // Test different sizes
+    // Test different sizes (origin is bottom-left, y-up, like DrawBot;
+    // text() puts the baseline at y)
     ctx.font_size(72.0);
-    ctx.text("The quick brown fox", 50.0, 100.0);
+    ctx.text("The quick brown fox", 50.0, 500.0);
 
     ctx.font_size(48.0);
-    ctx.text("jumps over the lazy dog", 50.0, 200.0);
+    ctx.text("jumps over the lazy dog", 50.0, 400.0);
 
     ctx.font_size(24.0);
     ctx.text("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 50.0, 300.0);
-    ctx.text("abcdefghijklmnopqrstuvwxyz", 50.0, 350.0);
-    ctx.text("0123456789 !@#$%^&*()", 50.0, 400.0);
+    ctx.text("abcdefghijklmnopqrstuvwxyz", 50.0, 250.0);
+    ctx.text("0123456789 !@#$%^&*()", 50.0, 200.0);
 
     renderer.render_to_png(&ctx, "font_test.png").unwrap();
 }
@@ -192,6 +193,11 @@ let mut ctx = Canvas::new(800.0, 600.0);
 ```
 
 ### Drawing Primitives
+
+Coordinates are DrawBot's: the origin is the **bottom-left** corner and y
+increases **upward**. `rect`, `oval`, and `image` anchor at their
+bottom-left corner.
+
 ```rust
 ctx.rect(x, y, width, height);
 ctx.oval(x, y, width, height);
@@ -224,10 +230,11 @@ ctx.font("Arial");
 ctx.font_size(48.0);
 ctx.fill(Color::black());
 
-// Draw single-line text
+// Draw text with the first line's baseline at (x, y), like DrawBot
 ctx.text("Hello World", 100.0, 100.0);
 
-// Draw multi-line text box with word wrapping
+// Word-wrapped text in a box anchored at its bottom-left corner;
+// text fills from the top of the box down
 ctx.text_box("Long text that wraps...", 100.0, 200.0, 400.0, 200.0);
 ```
 

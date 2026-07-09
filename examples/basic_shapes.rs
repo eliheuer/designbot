@@ -1,7 +1,8 @@
 use designbot::prelude::*;
 
 fn main() {
-    // Create a 1000x1000 canvas
+    // Create a 1000x1000 canvas. Coordinates are DrawBot's: origin at the
+    // bottom-left, y increases upward; rect/oval anchor at bottom-left.
     let mut ctx = Canvas::new(1000.0, 1000.0);
 
     // Set dark gray background

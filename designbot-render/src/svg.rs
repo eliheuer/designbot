@@ -4,8 +4,10 @@
 //! which arrives as filled glyph outline paths — so every canvas feature that
 //! renders to PNG renders to SVG as true vectors.
 //!
-//! SVG is y-down top-left like the canvas, so (unlike PDF) no global flip is
-//! needed. SVG is single-page: the renderer emits one page per file.
+//! SVG is y-down top-left like the device space draw commands arrive in
+//! (the canvas bakes the y-up user-space flip into every command transform),
+//! so unlike PDF no global flip is needed. SVG is single-page: the renderer
+//! emits one page per file.
 //!
 //! v1 limitations (each warns once instead of failing): gradients render as
 //! their first stop color, raster images are skipped, layer blend modes are
