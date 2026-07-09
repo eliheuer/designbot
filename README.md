@@ -263,9 +263,13 @@ renderer.render_to_png(&ctx, "output.png").unwrap();
 ### Social media export
 
 Social platforms strip ICC color profiles (assuming sRGB) and re-encode
-larger PNGs to JPEG, which washes out colors and smears fine linework.
-The social PNG export writes an explicit sRGB chunk and knocks one corner
-pixel to 99% alpha, which makes X/Twitter keep the upload as lossless PNG:
+images to 4:2:0-subsampled JPEG, which halves color resolution: thin
+saturated lines keep their brightness but lose their color, and dark
+flats band and block up. The social PNG export compensates up front: it
+writes an explicit sRGB chunk, pre-boosts saturation 12% around Rec. 709
+luma, lays down coarse deterministic film grain that masks banding and
+survives recompression, and knocks one corner pixel to 99% alpha, which
+makes X/Twitter keep the upload as lossless PNG:
 
 ```rust
 renderer.render_to_png_social(&ctx, "output.png").unwrap();
