@@ -64,6 +64,7 @@ color = "0.3"
 # Graphics and rendering
 wgpu = "22"
 image = "0.25"
+png = "0.17"
 
 # Font tooling
 norad = { version = "0.18", features = ["kurbo"] }

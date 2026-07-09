@@ -162,6 +162,44 @@ impl Renderer {
         Ok(())
     }
 
+    /// Render to a PNG optimized for posting on social media. Two changes
+    /// versus `render_to_png`: the file carries an explicit sRGB chunk
+    /// (platforms strip ICC profiles and assume sRGB, so tagging removes the
+    /// ambiguity that washes out colors), and the top-left pixel is knocked
+    /// to 99% alpha, which makes X/Twitter keep the upload as lossless PNG
+    /// instead of re-encoding it to JPEG and smearing fine linework.
+    /// Single-image export: a multi-page canvas emits its last page with a
+    /// warning, like SVG.
+    pub fn render_to_png_social(
+        &self,
+        canvas: &Canvas,
+        output_path: &str,
+    ) -> Result<(), DesignBotError> {
+        let mut frames = self.render_frames(canvas);
+        if frames.len() > 1 {
+            eprintln!("warning: social png is single-image; emitting the last page only");
+        }
+        let (mut data, _) = frames
+            .pop()
+            .ok_or_else(|| DesignBotError::RenderError("no frames to render".into()))?;
+        if data.len() >= 4 {
+            data[3] = 253; // ~99% alpha on one pixel: forces PNG passthrough
+        }
+        let file = std::fs::File::create(output_path).map_err(DesignBotError::IOError)?;
+        let mut encoder =
+            png::Encoder::new(std::io::BufWriter::new(file), self.width, self.height);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder.set_srgb(png::SrgbRenderingIntent::Perceptual);
+        let mut writer = encoder
+            .write_header()
+            .map_err(|e| DesignBotError::RenderError(format!("png encode: {e}")))?;
+        writer
+            .write_image_data(&data)
+            .map_err(|e| DesignBotError::RenderError(format!("png encode: {e}")))?;
+        Ok(())
+    }
+
     /// Render all pages to an animated GIF, honoring per-page frame durations
     /// (DrawBot: `newPage` + `frameDuration` + `saveImage("*.gif")`).
     pub fn render_to_gif(&self, canvas: &Canvas, output_path: &str) -> Result<(), DesignBotError> {

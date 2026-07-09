@@ -620,6 +620,7 @@ dependencies = [
  "parley",
  "pdf-writer",
  "peniko 0.5.0",
+ "png 0.17.16",
  "pollster",
  "swash",
  "thiserror 2.0.17",

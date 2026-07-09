@@ -19,6 +19,7 @@ swash.workspace = true
 color.workspace = true
 wgpu.workspace = true
 image.workspace = true
+png.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 pollster = "0.4"

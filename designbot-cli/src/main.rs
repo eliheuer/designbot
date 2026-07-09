@@ -17,6 +17,11 @@ struct Args {
     #[arg(long)]
     output: Option<String>,
 
+    /// Optimize PNG output for social media: embed an sRGB chunk and knock
+    /// one pixel to 99% alpha so X/Twitter keeps the lossless PNG.
+    #[arg(long)]
+    social: bool,
+
     /// Extra arguments forwarded to the compiled script (after --)
     #[arg(last = true)]
     script_args: Vec<String>,
@@ -26,7 +31,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     if let (Some(script_path), Some(output_path)) = (args.render, args.output) {
-        render_script(&script_path, &output_path, &args.script_args)?;
+        render_script(&script_path, &output_path, args.social, &args.script_args)?;
     } else {
         print_usage();
     }
@@ -45,7 +50,12 @@ fn print_usage() {
     eprintln!("  cargo run --example basic_shapes");
 }
 
-fn render_script(script_path: &str, output_path: &str, script_args: &[String]) -> Result<()> {
+fn render_script(
+    script_path: &str,
+    output_path: &str,
+    social: bool,
+    script_args: &[String],
+) -> Result<()> {
     let script_path = Path::new(script_path);
     let output_path = Path::new(output_path);
 
@@ -95,10 +105,10 @@ fn render_script(script_path: &str, output_path: &str, script_args: &[String]) -
 
     // Create wrapper script if needed, or replace output path if it exists
     let final_script = if needs_wrapper {
-        create_wrapper_script(&user_script, &output_abs)?
+        create_wrapper_script(&user_script, &output_abs, social)?
     } else {
         // Replace the output path in the user's render_to_png call
-        replace_output_path(&user_script, &output_abs)?
+        replace_output_path(&user_script, &output_abs, social)?
     };
 
     // Create/update Cargo project in cache
@@ -185,7 +195,7 @@ fn render_script(script_path: &str, output_path: &str, script_args: &[String]) -
 /// Pick the Renderer method from the output file extension (DrawBot's
 /// saveImage-by-extension behavior): .gif -> animated GIF, .mp4/.mov -> video
 /// via ffmpeg, .pdf -> vector PDF, .svg -> vector SVG, anything else -> PNG.
-fn render_method_for(output_path: &Path) -> &'static str {
+fn render_method_for(output_path: &Path, social: bool) -> &'static str {
     match output_path
         .extension()
         .and_then(|e| e.to_str())
@@ -196,11 +206,12 @@ fn render_method_for(output_path: &Path) -> &'static str {
         Some("mp4") | Some("mov") => "render_to_mp4",
         Some("pdf") => "render_to_pdf",
         Some("svg") => "render_to_svg",
+        _ if social => "render_to_png_social",
         _ => "render_to_png",
     }
 }
 
-fn create_wrapper_script(user_script: &str, output_path: &Path) -> Result<String> {
+fn create_wrapper_script(user_script: &str, output_path: &Path, social: bool) -> Result<String> {
     // Check if user script has a main function
     let has_main = user_script.contains("fn main");
 
@@ -225,7 +236,7 @@ fn main() {{
 }}
 "#,
             user_script = user_script,
-            method = render_method_for(output_path),
+            method = render_method_for(output_path, social),
             output = output_path.display().to_string().replace('\\', "\\\\")
         )
     };
@@ -233,12 +244,12 @@ fn main() {{
     Ok(wrapper)
 }
 
-fn replace_output_path(user_script: &str, output_path: &Path) -> Result<String> {
+fn replace_output_path(user_script: &str, output_path: &Path, social: bool) -> Result<String> {
     let output_str = output_path.display().to_string().replace('\\', "\\\\");
 
     // Retarget the script's render_to_* call to the requested output path AND
     // format (extension picks the method, DrawBot saveImage-style).
-    let method = render_method_for(output_path);
+    let method = render_method_for(output_path, social);
     let re = regex::Regex::new(r#"render_to_\w+\s*\(([^,]+),\s*"[^"]*"\)"#)
         .context("Failed to create regex")?;
 
