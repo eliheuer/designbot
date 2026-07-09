@@ -2,7 +2,7 @@
 
 A Rust-based 2D graphics generation tool inspired by [DrawBot](https://www.drawbot.com/) and [Processing](https://processing.org/). Create vector graphics, images, and animations through Rust code. This should be a fun way for type designers, graphic designers, artists, and students to learn [Rust](https://rust-lang.org/) programming. 
 
-<img width="3840" height="2160" alt="Image" src="https://github.com/user-attachments/assets/1c84c6ea-8603-439b-a3d8-6b9b209c9448" />
+<img width="3840" height="2160" alt="A Virtua Grotesk type specimen drawn with designbot, shown next to the Rust code that draws it" src="https://github.com/user-attachments/assets/0e0f71ad-e87c-46fc-94dc-2b6c32b07944" />
 
 ## Features
 
@@ -258,6 +258,23 @@ ctx.text("System Font", 100.0, 200.0);
 ```rust
 let renderer = Renderer::new(width, height);
 renderer.render_to_png(&ctx, "output.png").unwrap();
+```
+
+### Social media export
+
+Social platforms strip ICC color profiles (assuming sRGB) and re-encode
+larger PNGs to JPEG, which washes out colors and smears fine linework.
+The social PNG export writes an explicit sRGB chunk and knocks one corner
+pixel to 99% alpha, which makes X/Twitter keep the upload as lossless PNG:
+
+```rust
+renderer.render_to_png_social(&ctx, "output.png").unwrap();
+```
+
+Or from the CLI, applied to any script's PNG output:
+
+```bash
+designbot --render my_design.rs --output my_design.png --social
 ```
 
 ## Project Structure
