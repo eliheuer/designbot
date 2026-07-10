@@ -295,6 +295,21 @@ impl Renderer {
                 // yuv420p needs even dimensions
                 "-vf",
                 "pad=ceil(iw/2)*2:ceil(ih/2)*2",
+                // near-lossless master: outputs get recompressed by every
+                // social platform, so keep this generation pristine
+                "-c:v",
+                "libx264",
+                "-preset",
+                "slow",
+                "-crf",
+                "14",
+                // tag BT.709 so players don't guess (untagged = color shift)
+                "-colorspace",
+                "bt709",
+                "-color_primaries",
+                "bt709",
+                "-color_trc",
+                "bt709",
                 "-movflags",
                 "+faststart",
                 "-an",
