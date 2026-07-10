@@ -1,4 +1,23 @@
 use designbot_core::{Canvas, DesignBotError};
+
+/// Deterministic monochrome grain over an RGBA buffer: each pixel's RGB
+/// gets the same signed offset in ±levels, hashed from (frame, pixel), so
+/// renders are reproducible and the grain animates frame to frame.
+fn apply_grain(buf: &mut [u8], levels: f32, frame: u64) {
+    for (i, px) in buf.chunks_exact_mut(4).enumerate() {
+        // splitmix64-style avalanche of the (frame, pixel) pair
+        let mut h = frame
+            .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+            .wrapping_add((i as u64).wrapping_mul(0xD1B5_4A32_D192_ED03));
+        h ^= h >> 33;
+        h = h.wrapping_mul(0xFF51_AFD7_ED55_8CCD);
+        h ^= h >> 33;
+        let n = ((h & 0xFFFF) as f32 / 65535.0 - 0.5) * 2.0 * levels;
+        for c in &mut px[..3] {
+            *c = (*c as f32 + n).clamp(0.0, 255.0) as u8;
+        }
+    }
+}
 use anyrender::{ImageRenderer, PaintScene, Paint};
 use anyrender_vello_cpu::VelloCpuImageRenderer;
 use kurbo::Shape;
@@ -15,6 +34,12 @@ pub struct Renderer {
     width: u32,
     height: u32,
     custom_fonts: Vec<Vec<u8>>,
+    /// Animated luma grain applied to MP4 frames, in 8-bit levels of
+    /// amplitude (±grain). Defaults to a subtle 4.0: it dithers the dark
+    /// gradients that platform recompression turns into banding, and gives
+    /// the encoder real texture to hold onto instead of flat fields that
+    /// come back "plastic". Set to 0.0 for mathematically clean output.
+    grain: f32,
 }
 
 impl Renderer {
@@ -23,7 +48,16 @@ impl Renderer {
             width,
             height,
             custom_fonts: Vec::new(),
+            grain: 4.0,
         }
+    }
+
+    /// Set the animated grain amplitude for MP4 export (8-bit levels,
+    /// 0.0 disables). Grain is deterministic per frame, monochrome (equal
+    /// on RGB, so chroma subsampling can't smear it into color noise),
+    /// and regenerated every output frame so it reads as film texture.
+    pub fn set_grain(&mut self, levels: f32) {
+        self.grain = levels.max(0.0);
     }
 
     /// Load a font from a file path and register it for use
@@ -303,6 +337,11 @@ impl Renderer {
                 "slow",
                 "-crf",
                 "14",
+                // aq-mode 3 biases bits toward dark regions, which is
+                // exactly where flat-design backgrounds band after the
+                // platforms re-encode
+                "-x264-params",
+                "aq-mode=3",
                 // tag BT.709 so players don't guess (untagged = color shift)
                 "-colorspace",
                 "bt709",
@@ -330,10 +369,20 @@ impl Renderer {
                 .stdin
                 .as_mut()
                 .ok_or_else(|| DesignBotError::RenderError("ffmpeg stdin unavailable".into()))?;
+            let mut out_frame: u64 = 0;
+            let mut noisy: Vec<u8> = Vec::new();
             for (data, duration) in &frames {
                 let repeats = ((duration * fps).round() as usize).max(1);
                 for _ in 0..repeats {
-                    stdin.write_all(data).map_err(DesignBotError::IOError)?;
+                    if self.grain > 0.0 {
+                        noisy.clear();
+                        noisy.extend_from_slice(data);
+                        apply_grain(&mut noisy, self.grain, out_frame);
+                        stdin.write_all(&noisy).map_err(DesignBotError::IOError)?;
+                    } else {
+                        stdin.write_all(data).map_err(DesignBotError::IOError)?;
+                    }
+                    out_frame += 1;
                 }
             }
         }
