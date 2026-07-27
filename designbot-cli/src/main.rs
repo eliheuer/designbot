@@ -9,11 +9,15 @@ use std::process::Command;
 #[command(name = "designbot")]
 #[command(about = "A Rust-based 2D graphics generation tool", long_about = None)]
 struct Args {
-    /// Path to the design script (.rs file)
+    /// Path to the design script (.rs). Positional shorthand for --render;
+    /// with no --output the image is written next to it as <script>.png.
+    script: Option<String>,
+
+    /// Path to the design script (.rs file). Same as the positional argument.
     #[arg(long)]
     render: Option<String>,
 
-    /// Output file path (PNG, PDF, SVG, etc.)
+    /// Output file path (PNG, PDF, SVG, …). Defaults to <script>.png.
     #[arg(long)]
     output: Option<String>,
 
@@ -30,23 +34,37 @@ struct Args {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    if let (Some(script_path), Some(output_path)) = (args.render, args.output) {
-        render_script(&script_path, &output_path, args.social, &args.script_args)?;
-    } else {
+    // Script comes from the positional arg or --render.
+    let Some(script_path) = args.render.or(args.script) else {
         print_usage();
-    }
+        return Ok(());
+    };
+    // Output defaults to the script path with a .png extension.
+    let output_path = args
+        .output
+        .unwrap_or_else(|| default_output(&script_path));
 
-    Ok(())
+    render_script(&script_path, &output_path, args.social, &args.script_args)
+}
+
+/// `path/to/foo.rs` -> `path/to/foo.png`, so `designbot foo.rs` just works.
+fn default_output(script_path: &str) -> String {
+    Path::new(script_path)
+        .with_extension("png")
+        .to_string_lossy()
+        .into_owned()
 }
 
 fn print_usage() {
     eprintln!("DesignBot - A Rust-based 2D graphics generation tool");
     eprintln!();
     eprintln!("Usage:");
-    eprintln!("  designbot --render <SCRIPT> --output <OUTPUT>");
+    eprintln!("  designbot <SCRIPT>                 # writes <SCRIPT>.png next to it");
+    eprintln!("  designbot <SCRIPT> --social        # + sRGB-tagged, X-lossless PNG");
+    eprintln!("  designbot --render <S> --output <O>");
     eprintln!();
     eprintln!("Examples:");
-    eprintln!("  designbot --render design.rs --output output.png");
+    eprintln!("  designbot documentation/specimen-square.rs --social");
     eprintln!("  cargo run --example basic_shapes");
 }
 
