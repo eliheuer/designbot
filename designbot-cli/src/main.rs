@@ -21,10 +21,12 @@ struct Args {
     #[arg(long)]
     output: Option<String>,
 
-    /// Optimize PNG output for social media: embed an sRGB chunk and knock
-    /// one pixel to 99% alpha so X/Twitter keeps the lossless PNG.
+    /// Emit a plain, unmodified PNG. By default PNG output is optimized for
+    /// social/web: an sRGB chunk, saturation + grain pre-compensation for
+    /// platform JPEG recompression, and the X-lossless alpha trick. Pass
+    /// --raw to skip all of that (e.g. for a pixel-exact master).
     #[arg(long)]
-    social: bool,
+    raw: bool,
 
     /// Extra arguments forwarded to the compiled script (after --)
     #[arg(last = true)]
@@ -44,7 +46,7 @@ fn main() -> Result<()> {
         .output
         .unwrap_or_else(|| default_output(&script_path));
 
-    render_script(&script_path, &output_path, args.social, &args.script_args)
+    render_script(&script_path, &output_path, !args.raw, &args.script_args)
 }
 
 /// `path/to/foo.rs` -> `path/to/foo.png`, so `designbot foo.rs` just works.
@@ -59,12 +61,12 @@ fn print_usage() {
     eprintln!("DesignBot - A Rust-based 2D graphics generation tool");
     eprintln!();
     eprintln!("Usage:");
-    eprintln!("  designbot <SCRIPT>                 # writes <SCRIPT>.png next to it");
-    eprintln!("  designbot <SCRIPT> --social        # + sRGB-tagged, X-lossless PNG");
+    eprintln!("  designbot <SCRIPT>            # writes <SCRIPT>.png next to it (social-optimized)");
+    eprintln!("  designbot <SCRIPT> --raw     # plain, unmodified PNG");
     eprintln!("  designbot --render <S> --output <O>");
     eprintln!();
     eprintln!("Examples:");
-    eprintln!("  designbot documentation/specimen-square.rs --social");
+    eprintln!("  designbot documentation/specimen-square.rs");
     eprintln!("  cargo run --example basic_shapes");
 }
 
