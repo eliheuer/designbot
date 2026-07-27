@@ -80,3 +80,7 @@ indicatif = "0.17"
 # Core library shared
 designbot-core = { path = "designbot" }
 designbot-render = { path = "designbot-render" }
+
+[[example]]
+name = "specimen"
+path = "examples/specimen.rs"

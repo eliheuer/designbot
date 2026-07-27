@@ -10,7 +10,7 @@ pub use norad;
 // Single import prelude for beginners
 pub mod prelude {
     pub use designbot_core::motion::*;
-    pub use designbot_core::{Canvas, Color, TextAlign};
+    pub use designbot_core::{Canvas, Color, Format, TextAlign, Theme};
     pub use designbot_render::Renderer;
     pub use kurbo::BezPath;
 }
