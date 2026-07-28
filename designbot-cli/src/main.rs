@@ -33,7 +33,49 @@ struct Args {
     script_args: Vec<String>,
 }
 
+/// `designbot proof <font> [-o out.pdf]` — the built-in default print proof.
+#[derive(Parser, Debug)]
+#[command(name = "designbot proof", about = "Generate a print proof PDF for a font")]
+struct ProofArgs {
+    /// Path to the font to proof (.ttf / .otf, static or variable).
+    font: String,
+
+    /// Output PDF path. Defaults to <font>-proof.pdf next to the font.
+    #[arg(long, short)]
+    output: Option<String>,
+}
+
+fn run_proof(argv: &[String]) -> Result<()> {
+    let mut full = vec!["designbot-proof".to_string()];
+    full.extend_from_slice(argv);
+    let args = ProofArgs::parse_from(full);
+
+    let font = PathBuf::from(&args.font);
+    let output = args.output.unwrap_or_else(|| {
+        let stem = font
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "font".into());
+        font.with_file_name(format!("{stem}-proof.pdf"))
+            .to_string_lossy()
+            .into_owned()
+    });
+
+    println!("Proofing {} → {}", args.font, output);
+    designbot_render::generate_proof(&font, &output)
+        .with_context(|| format!("generating proof for {}", args.font))?;
+    println!("✓ Wrote {output}");
+    Ok(())
+}
+
 fn main() -> Result<()> {
+    // `designbot proof …` is handled before the render arg parser (which would
+    // otherwise treat "proof" as a positional script path).
+    let raw: Vec<String> = std::env::args().collect();
+    if raw.get(1).map(|s| s.as_str()) == Some("proof") {
+        return run_proof(&raw[2..]);
+    }
+
     let args = Args::parse();
 
     // Script comes from the positional arg or --render.
