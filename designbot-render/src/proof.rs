@@ -25,6 +25,9 @@ const M: f64 = 54.0; // margin
 const COLS: usize = 6; // Swiss modular columns
 const GUTTER: f64 = 16.0;
 const GRID_ROWS: u32 = 6;
+/// One size for ALL monospace chrome (headlines, labels, captions, running
+/// head, technical data) — the proof's information layer is uniform.
+const MONO_SIZE: f64 = 8.5;
 
 /// Width of a single grid column.
 fn col_w() -> f64 {
@@ -48,11 +51,12 @@ fn paper() -> Color {
 fn rule() -> Color {
     Color::rgb(0xcc, 0xcc, 0xcc)
 }
+// The information layer is pure black on white — no gray.
 fn faint() -> Color {
-    Color::rgb(0x80, 0x80, 0x80) // running head, gutter labels
+    ink()
 }
 fn hair() -> Color {
-    Color::rgb(0xa6, 0xa6, 0xa6) // tiny hex labels
+    ink()
 }
 fn grid_red() -> Color {
     Color::rgb(0xe6, 0x9a, 0x9a) // light red guide grid
@@ -105,6 +109,11 @@ struct FontFacts {
     features: Vec<String>,
     /// (codepoint, glyph id), sorted by codepoint.
     cmap: Vec<(u32, u16)>,
+    // vertical metrics, font units
+    cap_height: i64,
+    x_height: i64,
+    ascent: i64,
+    descent: i64,
 }
 
 fn tag_str(t: swash::Tag) -> String {
@@ -180,6 +189,10 @@ fn introspect(data: &[u8]) -> Result<FontFacts, DesignBotError> {
         instances,
         features,
         cmap,
+        cap_height: metrics.cap_height.round() as i64,
+        x_height: metrics.x_height.round() as i64,
+        ascent: metrics.ascent.round() as i64,
+        descent: metrics.descent.round() as i64,
     })
 }
 
@@ -247,7 +260,7 @@ impl<'a> Proof<'a> {
             .fill(faint())
             .font(MONO)
             .clear_font_variations()
-            .font_size(8.0)
+            .font_size(MONO_SIZE)
             .tracking(0.2)
             .auto_line_height()
             .text_align(TextAlign::Left);
@@ -258,21 +271,20 @@ impl<'a> Proof<'a> {
         self.ctx.line(M, y - 7.0, W - M, y - 7.0);
     }
 
-    /// Page title under the running head (proofed font, regular weight — the
-    /// proof only sets Bold where it is deliberately showing Bold).
+    /// Page headline — small monospace, never the proofed font (informational
+    /// chrome stays in the mono information layer).
     fn page_title(&mut self, title: &str) {
         self.ctx
             .no_stroke()
             .fill(ink())
-            .font(&self.facts.family)
+            .font(MONO)
             .clear_font_variations()
-            .font_variation("wght", 400.0)
-            .font_size(20.0)
-            .tracking(0.0)
+            .clear_font_features()
+            .font_size(MONO_SIZE)
+            .tracking(0.6)
             .auto_line_height()
             .text_align(TextAlign::Left);
-        self.ctx.text(title, M, H - 74.0);
-        self.ctx.clear_font_variations();
+        self.ctx.text(&title.to_uppercase(), M, H - 64.0);
     }
 
     /// Start a fresh interior sheet: white, grid overlay, running head, title.
@@ -296,7 +308,7 @@ impl<'a> Proof<'a> {
             .clear_font_variations()
             .clear_font_features()
             .fill(faint())
-            .font_size(6.5)
+            .font_size(MONO_SIZE)
             .tracking(0.5)
             .auto_line_height()
             .text_align(TextAlign::Left);
@@ -312,23 +324,28 @@ impl<'a> Proof<'a> {
             .map(|a| (a.min, a.default, a.max))
     }
 
-    /// A monospace field: tiny gray caps label + stacked value lines.
+    /// A monospace field: caps label, a hairline rule under the title, then
+    /// stacked value lines. All black, uniform mono size.
     fn field(&mut self, x: f64, top: f64, label: &str, values: &[String]) {
         self.ctx
             .no_stroke()
             .font(MONO)
             .clear_font_variations()
+            .clear_font_features()
             .text_align(TextAlign::Left)
             .auto_line_height()
             .tracking(0.6)
-            .fill(faint())
-            .font_size(6.5);
+            .fill(ink())
+            .font_size(MONO_SIZE);
         self.ctx.text(&label.to_uppercase(), x, top);
-        self.ctx.fill(ink()).tracking(0.0).font_size(8.5);
-        let mut y = top - 15.0;
+        // rule under the column title
+        self.ctx.stroke(ink()).stroke_width(0.75);
+        self.ctx.line(x, top - 8.0, x + col_w(), top - 8.0);
+        self.ctx.no_stroke().fill(ink()).tracking(0.0);
+        let mut y = top - 24.0;
         for v in values {
             self.ctx.text(v, x, y);
-            y -= 12.5;
+            y -= 13.0;
         }
     }
 
@@ -351,7 +368,7 @@ impl<'a> Proof<'a> {
             .tracking(1.5)
             .auto_line_height()
             .text_align(TextAlign::Left);
-        self.ctx.text(&self.facts.family, M, H - 150.0);
+        self.ctx.text(&self.facts.family, M, H - 120.0);
 
         // Technical data — monospace, in Swiss grid columns.
         let top = 250.0;
@@ -386,6 +403,12 @@ impl<'a> Proof<'a> {
             .chunks(2)
             .map(|c| c.join(" "))
             .collect();
+        let metrics = vec![
+            format!("cap {}", self.facts.cap_height),
+            format!("x-height {}", self.facts.x_height),
+            format!("ascender {}", self.facts.ascent),
+            format!("descender {}", self.facts.descent),
+        ];
         let mut meta = Vec::new();
         if !self.facts.version.is_empty() {
             meta.push(format!("version {}", self.facts.version));
@@ -401,7 +424,8 @@ impl<'a> Proof<'a> {
         self.field(col_x(1), top, "Instances", &instances);
         self.field(col_x(2), top, "Character", &character);
         self.field(col_x(3), top, "Features", &features);
-        self.field(col_x(4), top, "Build", &meta);
+        self.field(col_x(4), top, "Metrics", &metrics);
+        self.field(col_x(5), top, "Build", &meta);
     }
 
     fn char_set(&mut self) {
@@ -487,7 +511,7 @@ impl<'a> Proof<'a> {
             if y - s < M {
                 break;
             }
-            self.ctx.font(MONO).fill(faint()).font_size(8.0);
+            self.ctx.font(MONO).fill(faint()).font_size(MONO_SIZE);
             self.ctx.text(&format!("{}", s as i64), M, y);
             self.ctx.font(&self.facts.family).fill(ink()).font_size(s);
             self.ctx.text(sample, M + 34.0, y);
@@ -515,7 +539,7 @@ impl<'a> Proof<'a> {
             .font(MONO)
             .clear_font_variations()
             .fill(faint())
-            .font_size(6.5)
+            .font_size(MONO_SIZE)
             .tracking(0.4)
             .auto_line_height()
             .text_align(TextAlign::Left);
@@ -722,7 +746,7 @@ impl<'a> Proof<'a> {
         for i in 0..steps {
             let wght = min + (max - min) * (i as f64 / (steps - 1) as f64) as f32;
             self.ctx.font(MONO).clear_font_variations().clear_font_features();
-            self.ctx.fill(faint()).font_size(8.0).text_align(TextAlign::Left);
+            self.ctx.fill(faint()).font_size(MONO_SIZE).text_align(TextAlign::Left);
             self.ctx.text(&format!("{}", wght.round() as i64), M, y);
             self.ctx
                 .font(&fam)
@@ -763,7 +787,7 @@ impl<'a> Proof<'a> {
                 .clear_font_variations()
                 .clear_font_features()
                 .fill(faint())
-                .font_size(7.0)
+                .font_size(MONO_SIZE)
                 .tracking(0.3)
                 .text_align(TextAlign::Center);
             self.ctx.text(&format!("{}", wght.round() as i64), cx, top + 10.0);
