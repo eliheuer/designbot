@@ -172,16 +172,31 @@ impl Renderer {
         frames
     }
 
-    /// Render to PNG. A single-page canvas writes exactly `output_path`; a
-    /// multi-page canvas writes numbered siblings (`name_0001.png`, ...).
+    /// Write an RGBA8 buffer as an sRGB-tagged PNG. ALL PNG output goes through
+    /// here, so designbot images are never color-ambiguous: an untagged RGB PNG
+    /// is device-dependent, and OS/social pipelines then guess — which shifts
+    /// saturated colors between, say, a P3 display and Instagram.
+    fn write_srgb_png(path: &str, width: u32, height: u32, rgba: &[u8]) -> Result<(), DesignBotError> {
+        let file = std::fs::File::create(path).map_err(DesignBotError::IOError)?;
+        let mut encoder = png::Encoder::new(std::io::BufWriter::new(file), width, height);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder.set_source_srgb(png::SrgbRenderingIntent::Perceptual);
+        let mut writer = encoder
+            .write_header()
+            .map_err(|e| DesignBotError::RenderError(format!("png encode: {e}")))?;
+        writer
+            .write_image_data(rgba)
+            .map_err(|e| DesignBotError::RenderError(format!("png encode: {e}")))?;
+        Ok(())
+    }
+
+    /// Render to PNG (sRGB-tagged). A single-page canvas writes exactly
+    /// `output_path`; a multi-page canvas writes numbered siblings
+    /// (`name_0001.png`, ...).
     pub fn render_to_png(&self, canvas: &Canvas, output_path: &str) -> Result<(), DesignBotError> {
         let frames = self.render_frames(canvas);
-        let save = |path: &str, data: &[u8]| {
-            image::save_buffer(path, data, self.width, self.height, image::ColorType::Rgba8)
-                .map_err(|e| {
-                    DesignBotError::IOError(std::io::Error::new(std::io::ErrorKind::Other, e))
-                })
-        };
+        let save = |path: &str, data: &[u8]| Self::write_srgb_png(path, self.width, self.height, data);
         if frames.len() == 1 {
             save(output_path, &frames[0].0)?;
         } else {
@@ -256,19 +271,7 @@ impl Renderer {
         if data.len() >= 4 {
             data[3] = 253; // ~99% alpha on one pixel: forces PNG passthrough
         }
-        let file = std::fs::File::create(output_path).map_err(DesignBotError::IOError)?;
-        let mut encoder =
-            png::Encoder::new(std::io::BufWriter::new(file), self.width, self.height);
-        encoder.set_color(png::ColorType::Rgba);
-        encoder.set_depth(png::BitDepth::Eight);
-        encoder.set_source_srgb(png::SrgbRenderingIntent::Perceptual);
-        let mut writer = encoder
-            .write_header()
-            .map_err(|e| DesignBotError::RenderError(format!("png encode: {e}")))?;
-        writer
-            .write_image_data(&data)
-            .map_err(|e| DesignBotError::RenderError(format!("png encode: {e}")))?;
-        Ok(())
+        Self::write_srgb_png(output_path, self.width, self.height, &data)
     }
 
     /// Render all pages to an animated GIF, honoring per-page frame durations
