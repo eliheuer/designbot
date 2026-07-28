@@ -337,12 +337,15 @@ impl Renderer {
                 "slow",
                 "-crf",
                 "21",
-                // aq-mode 3 biases bits toward dark regions, which is
-                // exactly where flat-design backgrounds band after the
-                // platforms re-encode
+                // aq-mode 3 biases bits toward dark regions, which is exactly
+                // where flat-design backgrounds band after the platforms
+                // re-encode. The color* params write BT.709 straight into x264's
+                // VUI: passing them only as ffmpeg -color_* flags loses the
+                // primaries/transfer through the -vf filter, so viewers (a P3
+                // Mac vs Instagram) guess differently and colors shift.
                 "-x264-params",
-                "aq-mode=3",
-                // tag BT.709 so players don't guess (untagged = color shift)
+                "aq-mode=3:colorprim=bt709:transfer=bt709:colormatrix=bt709",
+                // also tag at the ffmpeg/container level (belt and suspenders)
                 "-colorspace",
                 "bt709",
                 "-color_primaries",
