@@ -382,9 +382,12 @@ impl<'a> Proof<'a> {
         let target = W - 2.0 * M;
         let gaps = (fam.chars().count().saturating_sub(1)) as f64;
         let track_frac = -0.025; // tight, negative tracking at display size
-        let size_h = grid_rh() * 0.80;
+        // Size to fill the content width (heaviest weight reaches the right
+        // margin, matching the small left margin), capped only enough that a
+        // row never vertically overlaps the one above it.
         let size_w = target / (self.name_w_100 / 100.0 + track_frac * gaps);
-        let size = size_h.min(size_w);
+        let vfit_cap = (grid_rh() + GUTTER) * 0.9;
+        let size = size_w.min(vfit_cap);
         let track = track_frac * size;
         let cap_px = size * self.facts.cap_height as f64 / self.facts.upm as f64;
 
