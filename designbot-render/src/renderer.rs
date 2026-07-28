@@ -407,7 +407,7 @@ impl Renderer {
     /// outline paths) stay resolution-independent; one PDF page per canvas
     /// page (DrawBot's multi-page `saveImage("*.pdf")` document model).
     pub fn render_to_pdf(&self, canvas: &Canvas, output_path: &str) -> Result<(), DesignBotError> {
-        use pdf_writer::{Pdf, Rect as PdfRect, Ref};
+        use pdf_writer::{Name, Pdf, Rect as PdfRect, Ref};
 
         let mut font_cx = FontContext::default();
         for font_data in &self.custom_fonts {
@@ -454,13 +454,38 @@ impl Renderer {
         pdf.pages(pages_id)
             .kids(rendered.iter().map(|(page_id, _, _)| *page_id))
             .count(rendered.len() as i32);
+
+        // Color management: the content streams emit plain DeviceRGB (`rg`/`RG`)
+        // colors, which are device-dependent — the same numbers drift between a
+        // P3 laptop, a viewer, and a press. Installing a calibrated RGB space as
+        // each page's /DefaultRGB makes conforming readers reinterpret every
+        // DeviceRGB operator through it, so brand colors stay consistent without
+        // touching a single color op in the content stream. We use CalRGB with
+        // sRGB's D65 white point and primaries (gamma ~2.2 approximates sRGB's
+        // piecewise transfer — close enough for flat specimen color; embed a
+        // real sRGB ICC profile as an OutputIntent if PDF/X press delivery ever
+        // needs an exact curve).
+        let srgb_cs = Ref::new(next_id); // last object allocated
+        pdf.color_space(srgb_cs).cal_rgb(
+            [0.9505, 1.0, 1.089], // D65 white point
+            None,
+            Some([2.2, 2.2, 2.2]), // sRGB transfer, approximated
+            Some([
+                0.4124, 0.2126, 0.0193, // red colorant   -> XYZ
+                0.3576, 0.7152, 0.1192, // green colorant -> XYZ
+                0.1805, 0.0722, 0.9505, // blue colorant  -> XYZ
+            ]),
+        );
+
         for (page_id, content_id, bytes) in &rendered {
             {
                 let mut page = pdf.page(*page_id);
                 page.parent(pages_id)
                     .media_box(PdfRect::new(0.0, 0.0, self.width as f32, self.height as f32))
                     .contents(*content_id);
-                page.resources();
+                page.resources()
+                    .color_spaces()
+                    .pair(Name(b"DefaultRGB"), srgb_cs);
             }
             // Outline-heavy content streams compress ~10x; PDF FlateDecode
             // is the zlib format.
