@@ -44,10 +44,9 @@ struct ProofArgs {
     #[arg(long, short)]
     output: Option<String>,
 
-    /// Hide the Swiss guide grid (it is drawn on every page by default while
-    /// the proof layout is in development).
+    /// Overlay the Swiss guide grid (off by default; useful when tuning layout).
     #[arg(long)]
-    no_grid: bool,
+    grid: bool,
 }
 
 fn run_proof(argv: &[String]) -> Result<()> {
@@ -67,7 +66,7 @@ fn run_proof(argv: &[String]) -> Result<()> {
     });
 
     println!("Proofing {} → {}", args.font, output);
-    designbot_render::generate_proof(&font, &output, !args.no_grid)
+    designbot_render::generate_proof(&font, &output, args.grid)
         .with_context(|| format!("generating proof for {}", args.font))?;
     println!("✓ Wrote {output}");
     Ok(())

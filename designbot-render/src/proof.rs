@@ -6,8 +6,8 @@
 //! Google Fonts' diffenator2 `proof` view.
 //!
 //! US Letter landscape (792 × 612 pt), laid out on a 6-column Swiss modular
-//! grid (toggle with `--no-grid`; on by default while the proof is in
-//! development). Technical data is set in IBM Plex Mono (bundled, OFL).
+//! grid (overlay it with `--grid` when tuning layout; off by default).
+//! Technical data is set in IBM Plex Mono (bundled, OFL).
 //! See virtua-grotesk/documentation/proofs/PROOF_SPEC.md for the page plan.
 
 use crate::Renderer;
