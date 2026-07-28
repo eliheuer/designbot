@@ -15,6 +15,11 @@ pub enum Format {
     Landscape,
     /// 9:16 — Reels / Stories / TikTok.
     Vertical,
+    /// 2:1 powers-of-two (2048 x 1024): height == a 1024 UPM, width == 2 UPM.
+    /// Grid-clean and wide enough for X / LinkedIn — the default for type work.
+    Wide,
+    /// 1:2 powers-of-two (1024 x 2048): width == a 1024 UPM. Grid-clean.
+    Tall,
 }
 
 impl Format {
@@ -25,6 +30,8 @@ impl Format {
             Format::Portrait => (1080.0, 1350.0),
             Format::Landscape => (2520.0, 1320.0),
             Format::Vertical => (1080.0, 1920.0),
+            Format::Wide => (2048.0, 1024.0),
+            Format::Tall => (1024.0, 2048.0),
         }
     }
     pub fn w(self) -> f64 {
@@ -40,6 +47,8 @@ impl Format {
             Format::Portrait => 96.0,
             Format::Landscape => 120.0,
             Format::Vertical => 96.0,
+            Format::Wide => 128.0,
+            Format::Tall => 128.0,
         }
     }
     /// Short slug for filenames / CLI args.
@@ -49,15 +58,19 @@ impl Format {
             Format::Portrait => "portrait",
             Format::Landscape => "landscape",
             Format::Vertical => "vertical",
+            Format::Wide => "wide",
+            Format::Tall => "tall",
         }
     }
-    /// Parse a slug (`"square"`, `"sq"`, `"portrait"`, `"wide"`, `"reel"`, …).
+    /// Parse a slug (`"square"`, `"wide"`, `"landscape"`, `"reel"`, …).
     pub fn from_slug(s: &str) -> Option<Format> {
         Some(match s.trim().to_ascii_lowercase().as_str() {
             "square" | "sq" => Format::Square,
             "portrait" | "feed" | "carousel" => Format::Portrait,
-            "landscape" | "wide" | "og" => Format::Landscape,
+            "landscape" | "og" => Format::Landscape,
             "vertical" | "reel" | "story" => Format::Vertical,
+            "wide" | "2x1" => Format::Wide,
+            "tall" | "1x2" => Format::Tall,
             _ => return None,
         })
     }

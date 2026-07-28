@@ -58,6 +58,35 @@ impl Grid {
         }
     }
 
+    /// A UPM-aware powers-of-two grid, mapped to the font's own coordinate
+    /// system: 1 font unit = 1 canvas pixel. `units_per_em` is the font's UPM
+    /// (e.g. 1024). Defaults to the **8-unit structural grid** (the faint
+    /// sub-lines) beneath a heavier reference line every `UPM / 8` units, so it
+    /// tiles any powers-of-two canvas exactly (2048, 1024, … are all multiples
+    /// of both 8 and UPM/8). Change the structural step with
+    /// [`Grid::structural`], or drop the reference with `.subdivisions(0)`.
+    ///
+    /// ```no_run
+    /// # use designbot::prelude::*;
+    /// # let (mut c, t) = (Canvas::new(2048.0, 1024.0), Theme::dark());
+    /// Grid::upm(1024.0).color(t.grid).border(false).draw(&mut c, 2048.0, 1024.0);
+    /// ```
+    pub fn upm(units_per_em: f64) -> Self {
+        let reference = units_per_em / 8.0; // e.g. 128 for a 1024 UPM
+        let subdivisions = (reference / 8.0).round().max(1.0) as u32; // 8-unit
+        Grid::unit(reference).subdivisions(subdivisions).border(false)
+    }
+
+    /// Set the structural (finest) grid step in font units for a [`Grid::upm`]
+    /// grid — 8 by default. E.g. `.structural(16)` for a 16-unit grid.
+    pub fn structural(mut self, units: f64) -> Self {
+        if let Kind::Unit { unit, .. } = self.kind {
+            let n = (unit / units).round().max(1.0) as u32;
+            self.kind = Kind::Unit { unit, subdivisions: n };
+        }
+        self
+    }
+
     /// A Swiss / Müller-Brockmann modular grid: `columns` x `rows` boxes.
     pub fn modular(columns: u32, rows: u32) -> Self {
         Grid {
