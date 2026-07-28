@@ -173,11 +173,19 @@ fn render_script(
         None
     };
 
-    // Compile in cache directory, but run from user's directory
+    // Compile in cache directory, but run from user's directory.
+    // Cap lints to `allow` so building designbot (a path dependency here) and
+    // the user's script never spew warnings into the render output — only real
+    // errors surface.
+    let rustflags = match std::env::var("RUSTFLAGS") {
+        Ok(existing) if !existing.is_empty() => format!("{existing} --cap-lints=allow"),
+        _ => "--cap-lints=allow".to_string(),
+    };
     let status = Command::new("cargo")
         .arg("build")
         .arg("--release")
         .arg("--quiet")
+        .env("RUSTFLAGS", rustflags)
         .current_dir(&cache_dir)
         .status()
         .context("Failed to compile")?;

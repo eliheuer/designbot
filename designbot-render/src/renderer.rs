@@ -261,7 +261,7 @@ impl Renderer {
             png::Encoder::new(std::io::BufWriter::new(file), self.width, self.height);
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
-        encoder.set_srgb(png::SrgbRenderingIntent::Perceptual);
+        encoder.set_source_srgb(png::SrgbRenderingIntent::Perceptual);
         let mut writer = encoder
             .write_header()
             .map_err(|e| DesignBotError::RenderError(format!("png encode: {e}")))?;

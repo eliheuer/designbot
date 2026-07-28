@@ -47,6 +47,7 @@ impl Default for GraphicsState {
 }
 
 impl GraphicsState {
+    #[allow(dead_code)] // convenience constructor; Default is used internally
     pub fn new() -> Self {
         Self::default()
     }
