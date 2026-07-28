@@ -382,12 +382,12 @@ impl<'a> Proof<'a> {
         let target = W - 2.0 * M;
         let gaps = (fam.chars().count().saturating_sub(1)) as f64;
         let track_frac = -0.025; // tight, negative tracking at display size
-        // Size to fill the content width (heaviest weight reaches the right
-        // margin, matching the small left margin), capped only enough that a
-        // row never vertically overlaps the one above it.
+        // Size so the cap-height fills the grid row — small, even margins top
+        // and bottom to match the small side margins — capped by the width so a
+        // long family name can't overflow the page.
+        let size_cap = grid_rh() * (self.facts.upm as f64 / self.facts.cap_height as f64) * 0.9;
         let size_w = target / (self.name_w_100 / 100.0 + track_frac * gaps);
-        let vfit_cap = (grid_rh() + GUTTER) * 0.9;
-        let size = size_w.min(vfit_cap);
+        let size = size_cap.min(size_w);
         let track = track_frac * size;
         let cap_px = size * self.facts.cap_height as f64 / self.facts.upm as f64;
 
