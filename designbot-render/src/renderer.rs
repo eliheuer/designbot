@@ -336,7 +336,7 @@ impl Renderer {
                 "-preset",
                 "slow",
                 "-crf",
-                "14",
+                "21",
                 // aq-mode 3 biases bits toward dark regions, which is
                 // exactly where flat-design backgrounds band after the
                 // platforms re-encode
@@ -582,9 +582,11 @@ impl Renderer {
                 align,
                 variations,
                 brush,
+                stroke_brush,
+                stroke_width,
                 transform,
             } => {
-                Self::render_text(painter, text, *x, *y, None, font_family.as_deref(), *font_size, *line_height, *letter_spacing, *align, variations, brush, transform, font_cx);
+                Self::render_text(painter, text, *x, *y, None, font_family.as_deref(), *font_size, *line_height, *letter_spacing, *align, variations, brush, stroke_brush.as_ref(), *stroke_width, transform, font_cx);
             }
             DrawCommand::DrawTextBox {
                 text,
@@ -599,9 +601,11 @@ impl Renderer {
                 align,
                 variations,
                 brush,
+                stroke_brush,
+                stroke_width,
                 transform,
             } => {
-                Self::render_text(painter, text, *x, *y, Some((*width, *height)), font_family.as_deref(), *font_size, *line_height, *letter_spacing, *align, variations, brush, transform, font_cx);
+                Self::render_text(painter, text, *x, *y, Some((*width, *height)), font_family.as_deref(), *font_size, *line_height, *letter_spacing, *align, variations, brush, stroke_brush.as_ref(), *stroke_width, transform, font_cx);
             }
             DrawCommand::DrawImage {
                 data,
@@ -766,6 +770,8 @@ impl Renderer {
         align: designbot_core::canvas::TextAlign,
         variations: &[(u32, f32)],
         brush: &peniko::Brush,
+        stroke_brush: Option<&peniko::Brush>,
+        stroke_width: f64,
         transform: &kurbo::Affine,
         font_cx: &RefCell<FontContext>,
     ) {
@@ -970,6 +976,17 @@ impl Renderer {
                                 None,
                                 &path,
                             );
+                            // Optional stroke (DrawBot fill + stroke on text).
+                            if let Some(sb) = stroke_brush {
+                                let stroke_paint = Self::brush_to_color(sb);
+                                painter.stroke(
+                                    &kurbo::Stroke::new(stroke_width),
+                                    final_transform,
+                                    &stroke_paint,
+                                    None,
+                                    &path,
+                                );
+                            }
                         }
 
                         // Advance to next glyph position

@@ -62,6 +62,8 @@ pub enum DrawCommand {
         align: TextAlign,
         variations: Vec<(u32, f32)>,
         brush: Brush,
+        stroke_brush: Option<Brush>,
+        stroke_width: f64,
         transform: Affine,
     },
     DrawTextBox {
@@ -77,6 +79,8 @@ pub enum DrawCommand {
         align: TextAlign,
         variations: Vec<(u32, f32)>,
         brush: Brush,
+        stroke_brush: Option<Brush>,
+        stroke_width: f64,
         transform: Affine,
     },
     /// Draw a raster image (straight-alpha RGBA8) at its natural size, honoring
@@ -481,6 +485,8 @@ impl Canvas {
                 align: state.text_align,
                 variations: state.font_variations.clone(),
                 brush: Brush::Solid(fill_color.to_peniko()),
+                stroke_brush: state.stroke_color.map(|c| Brush::Solid(c.to_peniko())),
+                stroke_width: state.stroke_width,
                 transform: state.transform,
             });
         }
@@ -508,6 +514,8 @@ impl Canvas {
                 align: state.text_align,
                 variations: state.font_variations.clone(),
                 brush: Brush::Solid(fill_color.to_peniko()),
+                stroke_brush: state.stroke_color.map(|c| Brush::Solid(c.to_peniko())),
+                stroke_width: state.stroke_width,
                 transform: state.transform,
             });
         }
