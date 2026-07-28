@@ -42,6 +42,19 @@ fn span_w(n: usize) -> f64 {
     n as f64 * col_w() + (n as f64 - 1.0) * GUTTER
 }
 
+// --- grid row geometry (y-up), so content can snap to the modular grid ------
+fn grid_rh() -> f64 {
+    (H - 2.0 * M - (GRID_ROWS as f64 - 1.0) * GUTTER) / GRID_ROWS as f64
+}
+/// Bottom edge (lower y) of grid row `r`, 0 = bottom row.
+fn grid_row_bottom(r: u32) -> f64 {
+    M + r as f64 * (grid_rh() + GUTTER)
+}
+/// Top edge (higher y) of grid row `r`.
+fn grid_row_top(r: u32) -> f64 {
+    grid_row_bottom(r) + grid_rh()
+}
+
 fn ink() -> Color {
     Color::rgb(0x23, 0x23, 0x23)
 }
@@ -232,6 +245,8 @@ struct Proof<'a> {
     git: String,
     folio: usize,
     grid: bool,
+    /// Advance width of the family name at 100 pt (for fitting the cover title).
+    name_w_100: f64,
 }
 
 impl<'a> Proof<'a> {
@@ -281,10 +296,10 @@ impl<'a> Proof<'a> {
             .clear_font_variations()
             .clear_font_features()
             .font_size(MONO_SIZE)
-            .tracking(0.6)
+            .tracking(0.0)
             .auto_line_height()
             .text_align(TextAlign::Left);
-        self.ctx.text(&title.to_uppercase(), M, H - 64.0);
+        self.ctx.text(title, M, H - 64.0);
     }
 
     /// Start a fresh interior sheet: white, grid overlay, running head, title.
@@ -300,19 +315,19 @@ impl<'a> Proof<'a> {
         self.page_title(title);
     }
 
-    /// A small monospace caption (gray, letter-spaced caps).
+    /// A small monospace caption (black, mixed case).
     fn mono_caption(&mut self, text: &str, x: f64, y: f64) {
         self.ctx
             .no_stroke()
             .font(MONO)
             .clear_font_variations()
             .clear_font_features()
-            .fill(faint())
+            .fill(ink())
             .font_size(MONO_SIZE)
-            .tracking(0.5)
+            .tracking(0.0)
             .auto_line_height()
             .text_align(TextAlign::Left);
-        self.ctx.text(&text.to_uppercase(), x, y);
+        self.ctx.text(text, x, y);
     }
 
     /// The wght axis (min, default, max), if present.
@@ -324,9 +339,9 @@ impl<'a> Proof<'a> {
             .map(|a| (a.min, a.default, a.max))
     }
 
-    /// A monospace field: caps label, a hairline rule under the title, then
-    /// stacked value lines. All black, uniform mono size.
-    fn field(&mut self, x: f64, top: f64, label: &str, values: &[String]) {
+    /// A monospace field for the cover: a column title sitting just above a
+    /// hairline bar that is snapped to a grid line, with value lines below it.
+    fn field(&mut self, x: f64, bar_y: f64, label: &str, values: &[String]) {
         self.ctx
             .no_stroke()
             .font(MONO)
@@ -334,15 +349,17 @@ impl<'a> Proof<'a> {
             .clear_font_features()
             .text_align(TextAlign::Left)
             .auto_line_height()
-            .tracking(0.6)
+            .tracking(0.0)
             .fill(ink())
             .font_size(MONO_SIZE);
-        self.ctx.text(&label.to_uppercase(), x, top);
-        // rule under the column title
+        // title above the bar
+        self.ctx.text(label, x, bar_y + 7.0);
+        // bar on the grid line, one column wide
         self.ctx.stroke(ink()).stroke_width(0.75);
-        self.ctx.line(x, top - 8.0, x + col_w(), top - 8.0);
-        self.ctx.no_stroke().fill(ink()).tracking(0.0);
-        let mut y = top - 24.0;
+        self.ctx.line(x, bar_y, x + col_w(), bar_y);
+        // values below the bar
+        self.ctx.no_stroke().fill(ink());
+        let mut y = bar_y - 16.0;
         for v in values {
             self.ctx.text(v, x, y);
             y -= 13.0;
@@ -357,26 +374,37 @@ impl<'a> Proof<'a> {
             self.grid_overlay();
         }
 
-        // Family name — regular weight, a little tracking, large.
+        // Family name — regular weight, generous tracking, sized to fill the
+        // content width, and vertically centered in the top grid row so the
+        // space above the caps equals the space below (top margin == sides).
+        let target = W - 2.0 * M;
+        let gaps = (self.facts.family.chars().count().saturating_sub(1)) as f64;
+        let track_frac = 0.12; // a lot of tracking at display size
+        let size = (target / (self.name_w_100 / 100.0 + track_frac * gaps)).min(96.0);
+        let track = track_frac * size;
+        let cap_px = size * self.facts.cap_height as f64 / self.facts.upm as f64;
+        let top_row = GRID_ROWS - 1;
+        let cell_center = (grid_row_bottom(top_row) + grid_row_top(top_row)) / 2.0;
+        let baseline = cell_center - cap_px / 2.0;
         self.ctx
             .no_stroke()
             .fill(ink())
             .font(&self.facts.family)
             .clear_font_variations()
             .font_variation("wght", 400.0)
-            .font_size(78.0)
-            .tracking(1.5)
+            .font_size(size)
+            .tracking(track)
             .auto_line_height()
             .text_align(TextAlign::Left);
-        self.ctx.text(&self.facts.family, M, H - 120.0);
+        self.ctx.text(&self.facts.family, M, baseline);
 
-        // Technical data — monospace, in Swiss grid columns.
-        let top = 250.0;
+        // Technical data — monospace columns; bars snapped to a grid line.
+        let bar_y = grid_row_top(1);
         let axes: Vec<String> = self
             .facts
             .axes
             .iter()
-            .map(|a| format!("{} {}-{}", a.tag, num(a.min), num(a.max)))
+            .map(|a| format!("{} {}–{}", a.tag, num(a.min), num(a.max)))
             .collect();
         let instances: Vec<String> = self
             .facts
@@ -394,7 +422,6 @@ impl<'a> Proof<'a> {
         let character = vec![
             format!("{} glyphs", self.facts.glyph_count),
             format!("{} encoded", self.facts.encoded),
-            format!("{} upm", self.facts.upm),
         ];
         // features wrapped 2 per line
         let features: Vec<String> = self
@@ -404,10 +431,11 @@ impl<'a> Proof<'a> {
             .map(|c| c.join(" "))
             .collect();
         let metrics = vec![
+            format!("{} upm", self.facts.upm),
             format!("cap {}", self.facts.cap_height),
             format!("x-height {}", self.facts.x_height),
             format!("ascender {}", self.facts.ascent),
-            format!("descender {}", self.facts.descent),
+            format!("descender {}", -self.facts.descent.abs()),
         ];
         let mut meta = Vec::new();
         if !self.facts.version.is_empty() {
@@ -420,12 +448,12 @@ impl<'a> Proof<'a> {
             meta.push(format!("generated {}", self.date));
         }
 
-        self.field(col_x(0), top, "Axes", &axes);
-        self.field(col_x(1), top, "Instances", &instances);
-        self.field(col_x(2), top, "Character", &character);
-        self.field(col_x(3), top, "Features", &features);
-        self.field(col_x(4), top, "Metrics", &metrics);
-        self.field(col_x(5), top, "Build", &meta);
+        self.field(col_x(0), bar_y, "Axes", &axes);
+        self.field(col_x(1), bar_y, "Instances", &instances);
+        self.field(col_x(2), bar_y, "Character", &character);
+        self.field(col_x(3), bar_y, "Features", &features);
+        self.field(col_x(4), bar_y, "Metrics", &metrics);
+        self.field(col_x(5), bar_y, "Build", &meta);
     }
 
     fn char_set(&mut self) {
@@ -842,6 +870,7 @@ pub fn generate_proof(
     let mut r = Renderer::new(W as u32, H as u32);
     r.load_font(font_path)?;
     r.load_font_data(MONO_TTF.to_vec());
+    let name_w_100 = r.text_width(&facts.family, Some(&facts.family), 100.0, &[]);
 
     let mut proof = Proof {
         ctx: Canvas::new(W, H),
@@ -850,6 +879,7 @@ pub fn generate_proof(
         git: git_hash(font_path),
         folio: 1,
         grid,
+        name_w_100,
     };
     proof.cover();
     proof.char_set();
