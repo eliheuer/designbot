@@ -182,9 +182,10 @@ impl Grid {
             }
         }
         if self.center {
+            // Keep the center lines inside the margin, like the rest of the grid.
             ctx.no_fill().stroke(self.color).stroke_width(self.stroke);
-            ctx.line(w / 2.0, 0.0, w / 2.0, h);
-            ctx.line(0.0, h / 2.0, w, h / 2.0);
+            ctx.line(w / 2.0, y0, w / 2.0, y1);
+            ctx.line(x0, h / 2.0, x1, h / 2.0);
         }
         if self.border {
             ctx.no_fill().stroke(self.color).stroke_width(self.stroke);
