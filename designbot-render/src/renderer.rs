@@ -75,6 +75,13 @@ impl Renderer {
         Ok(())
     }
 
+    /// Register a font from raw bytes already in memory (e.g. an
+    /// `include_bytes!`-embedded face). Same effect as [`Renderer::load_font`]
+    /// without touching the filesystem.
+    pub fn load_font_data(&mut self, data: Vec<u8>) {
+        self.custom_fonts.push(data);
+    }
+
     /// Measure the advance width, in pixels, of a single line of text with the
     /// given font/size/axes — the equivalent of DrawBot's `textSize()[0]`. Uses
     /// the same shaping path as rendering, including any registered custom fonts.

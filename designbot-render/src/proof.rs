@@ -2,23 +2,42 @@
 //!
 //! `designbot proof <font> -o proof.pdf` introspects any font (axes, named
 //! instances, charset, metrics, features) and emits a multi-page, color-managed
-//! PDF proof — no per-repo script required. The proof is designed as a superset
-//! by eye of Google Fonts' diffenator2 `proof` view, so a designer can confirm
-//! everything the machines check.
+//! PDF proof — no per-repo script required. Designed as a superset by eye of
+//! Google Fonts' diffenator2 `proof` view.
 //!
-//! US Letter landscape (792 × 612 pt). This is phase 1: cover, character-set
-//! grid, and waterfall. Spacing / figures / accents / kerning / weight /
-//! interpolation / text / features pages follow (see
-//! virtua-grotesk/documentation/proofs/PROOF_SPEC.md).
+//! US Letter landscape (792 × 612 pt), laid out on a 6-column Swiss modular
+//! grid (toggle with `--no-grid`; on by default while the proof is in
+//! development). Technical data is set in IBM Plex Mono (bundled, OFL).
+//! See virtua-grotesk/documentation/proofs/PROOF_SPEC.md for the page plan.
 
 use crate::Renderer;
-use designbot_core::{Canvas, Color, DesignBotError, TextAlign};
+use designbot_core::{Canvas, Color, DesignBotError, Grid, TextAlign};
 use std::path::Path;
+
+// --- bundled monospace for technical chrome (OFL, see assets/) -------------
+const MONO_TTF: &[u8] = include_bytes!("../assets/IBMPlexMono-Regular.ttf");
+const MONO: &str = "IBM Plex Mono";
 
 // --- page geometry (US Letter landscape, points = px) ----------------------
 const W: f64 = 792.0;
 const H: f64 = 612.0;
 const M: f64 = 54.0; // margin
+const COLS: usize = 6; // Swiss modular columns
+const GUTTER: f64 = 16.0;
+const GRID_ROWS: u32 = 6;
+
+/// Width of a single grid column.
+fn col_w() -> f64 {
+    (W - 2.0 * M - (COLS as f64 - 1.0) * GUTTER) / COLS as f64
+}
+/// Left edge of grid column `i` (0-based).
+fn col_x(i: usize) -> f64 {
+    M + i as f64 * (col_w() + GUTTER)
+}
+/// Width of a text block spanning `n` grid columns.
+fn span_w(n: usize) -> f64 {
+    n as f64 * col_w() + (n as f64 - 1.0) * GUTTER
+}
 
 fn ink() -> Color {
     Color::rgb(0x23, 0x23, 0x23)
@@ -26,29 +45,17 @@ fn ink() -> Color {
 fn paper() -> Color {
     Color::rgb(0xff, 0xff, 0xff)
 }
-fn cover_bg() -> Color {
-    Color::rgb(0x92, 0x92, 0x8e)
-}
 fn rule() -> Color {
     Color::rgb(0xcc, 0xcc, 0xcc)
 }
-// Real gray values (the PDF backend ignores per-paint alpha, so these must be
-// solid colors, not ink().with_alpha(...)).
 fn faint() -> Color {
     Color::rgb(0x80, 0x80, 0x80) // running head, gutter labels
 }
 fn hair() -> Color {
     Color::rgb(0xa6, 0xa6, 0xa6) // tiny hex labels
 }
-fn hues() -> [Color; 6] {
-    [
-        Color::oklch(0.66, 0.175, 28.0),
-        Color::oklch(0.74, 0.160, 52.0),
-        Color::oklch(0.88, 0.160, 92.0),
-        Color::oklch(0.67, 0.160, 159.0),
-        Color::oklch(0.65, 0.160, 258.0),
-        Color::oklch(0.65, 0.160, 302.0),
-    ]
+fn grid_red() -> Color {
+    Color::rgb(0xe6, 0x9a, 0x9a) // light red guide grid
 }
 
 /// Format a float axis value without a trailing `.0` (400.0 -> "400").
@@ -58,6 +65,19 @@ fn num(v: f32) -> String {
     } else {
         format!("{:.2}", v)
     }
+}
+
+/// A paragraph of neutral prose to exercise the font in running text. Repeated
+/// to fill tall columns; the same text across columns makes size / leading /
+/// tracking differences directly comparable.
+const SAMPLE: &str = "Typography is the craft of arranging letters so that language becomes visible. A typeface earns its keep in running text, where the rhythm of repeated forms, the fit between letters, and the balance of black and white decide whether a page invites reading or resists it. Grotesk designs strip ornament away and let structure carry the voice: even strokes, open counters, and a steady cadence from one word to the next. Set at reading sizes, the plain letters gather into a quiet, legible texture. This proof tests that texture across sizes, leading, and spacing before the design is trusted with real words. ";
+
+fn filled(min_chars: usize) -> String {
+    let mut s = String::new();
+    while s.len() < min_chars {
+        s.push_str(SAMPLE);
+    }
+    s
 }
 
 // --- introspection ---------------------------------------------------------
@@ -99,23 +119,16 @@ fn introspect(data: &[u8]) -> Result<FontFacts, DesignBotError> {
 
     let metrics = font.metrics(&[]);
 
-    // Names: prefer typographic (name ID 16) family over legacy (ID 1).
     let (mut family, mut family_legacy, mut version) = (None, None, None);
     for s in font.localized_strings() {
-        let id = s.id();
-        match id {
-            StringId::TypographicFamily if family.is_none() => {
-                family = Some(s.to_string())
-            }
-            StringId::Family if family_legacy.is_none() => {
-                family_legacy = Some(s.to_string())
-            }
+        match s.id() {
+            StringId::TypographicFamily if family.is_none() => family = Some(s.to_string()),
+            StringId::Family if family_legacy.is_none() => family_legacy = Some(s.to_string()),
             StringId::Version if version.is_none() => version = Some(s.to_string()),
             _ => {}
         }
     }
     let family = family.or(family_legacy).unwrap_or_else(|| "Unknown".into());
-    // Version string is usually "Version 1.000"; keep just the number if present.
     let version = version
         .map(|v| v.trim().trim_start_matches("Version").trim().to_string())
         .unwrap_or_default();
@@ -170,27 +183,71 @@ fn introspect(data: &[u8]) -> Result<FontFacts, DesignBotError> {
     })
 }
 
+/// Best-effort short git hash of the repo containing `path`; empty on failure.
+fn git_hash(path: &Path) -> String {
+    let dir = path.parent().unwrap_or(Path::new("."));
+    std::process::Command::new("git")
+        .args(["-C"])
+        .arg(dir)
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default()
+}
+
+/// Best-effort ISO date (YYYY-MM-DD) via the system `date`; empty on failure.
+fn today() -> String {
+    std::process::Command::new("date")
+        .arg("+%Y-%m-%d")
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_default()
+}
+
 // --- proof builder ---------------------------------------------------------
 
 struct Proof<'a> {
     ctx: Canvas,
     facts: &'a FontFacts,
     date: String,
+    git: String,
     folio: usize,
+    grid: bool,
 }
 
 impl<'a> Proof<'a> {
+    fn fam(&self) -> String {
+        self.facts.family.clone()
+    }
+
+    /// Light-red Swiss modular grid overlay (guide while designing the proof).
+    fn grid_overlay(&mut self) {
+        Grid::modular(COLS as u32, GRID_ROWS)
+            .margin(M)
+            .gutter(GUTTER)
+            .color(grid_red())
+            .stroke_width(0.5)
+            .draw(&mut self.ctx, W, H);
+    }
+
     /// Small self-identifying header on every interior page + a hairline rule.
     fn running_head(&mut self, section: &str) {
         let y = H - 38.0;
-        let left = format!("{}  ·  {}", self.facts.family, section);
+        let fam = self.fam();
+        let left = format!("{}  ·  {}", fam, section);
         let right = format!("{}   ·   {}", self.date, self.folio);
         self.ctx
             .no_stroke()
             .fill(faint())
-            .font(&self.facts.family)
+            .font(MONO)
             .clear_font_variations()
-            .font_size(8.5)
+            .font_size(8.0)
             .tracking(0.2)
             .auto_line_height()
             .text_align(TextAlign::Left);
@@ -201,7 +258,7 @@ impl<'a> Proof<'a> {
         self.ctx.line(M, y - 7.0, W - M, y - 7.0);
     }
 
-    /// Page title under the running head (semibold).
+    /// Page title under the running head (proofed font, semibold).
     fn page_title(&mut self, title: &str) {
         self.ctx
             .no_stroke()
@@ -217,106 +274,164 @@ impl<'a> Proof<'a> {
         self.ctx.clear_font_variations();
     }
 
-    /// Start a fresh interior sheet (white, running head, title).
+    /// Start a fresh interior sheet: white, grid overlay, running head, title.
     fn new_sheet(&mut self, section: &str, title: &str) {
         self.folio += 1;
         self.ctx.new_page();
         self.ctx.background(paper());
+        if self.grid {
+            self.grid_overlay();
+        }
         self.running_head(section);
         self.page_title(title);
+    }
+
+    /// A monospace field: tiny gray caps label + stacked value lines.
+    fn field(&mut self, x: f64, top: f64, label: &str, values: &[String]) {
+        self.ctx
+            .no_stroke()
+            .font(MONO)
+            .clear_font_variations()
+            .text_align(TextAlign::Left)
+            .auto_line_height()
+            .tracking(0.6)
+            .fill(faint())
+            .font_size(6.5);
+        self.ctx.text(&label.to_uppercase(), x, top);
+        self.ctx.fill(ink()).tracking(0.0).font_size(8.5);
+        let mut y = top - 15.0;
+        for v in values {
+            self.ctx.text(v, x, y);
+            y -= 12.5;
+        }
     }
 
     // ---- pages ----
 
     fn cover(&mut self) {
-        self.ctx.background(cover_bg());
+        self.ctx.background(paper());
+        if self.grid {
+            self.grid_overlay();
+        }
 
-        // Family name, large + bold.
+        // Family name — regular weight, a little tracking, large.
         self.ctx
             .no_stroke()
             .fill(ink())
             .font(&self.facts.family)
             .clear_font_variations()
-            .font_variation("wght", 700.0)
-            .font_size(92.0)
-            .tracking(-2.0)
+            .font_variation("wght", 400.0)
+            .font_size(78.0)
+            .tracking(1.5)
             .auto_line_height()
             .text_align(TextAlign::Left);
-        self.ctx.text(&self.facts.family, M, H - 190.0);
+        self.ctx.text(&self.facts.family, M, H - 150.0);
 
-        // Subtitle.
-        self.ctx
-            .clear_font_variations()
-            .font_variation("wght", 400.0)
-            .font_size(22.0)
-            .tracking(0.5);
-        self.ctx.text("Print Proof", M, H - 226.0);
-
-        // Six brand dots.
-        for (i, c) in hues().iter().enumerate() {
-            self.ctx.fill(*c).no_stroke();
-            self.ctx.oval(M + i as f64 * 30.0, H - 268.0, 18.0, 18.0);
-        }
-
-        // Metadata block, bottom-left.
-        let axes = self
+        // Technical data — monospace, in Swiss grid columns.
+        let top = 250.0;
+        let axes: Vec<String> = self
             .facts
             .axes
             .iter()
-            .map(|a| format!("{} {}–{} ({})", a.tag, num(a.min), num(a.max), num(a.default)))
-            .collect::<Vec<_>>()
-            .join("    ");
-        let instances = self
+            .map(|a| format!("{} {}-{}", a.tag, num(a.min), num(a.max)))
+            .collect();
+        let instances: Vec<String> = self
             .facts
             .instances
             .iter()
             .map(|i| {
-                let v = i
-                    .values
-                    .iter()
-                    .map(|x| num(*x))
-                    .collect::<Vec<_>>()
-                    .join("/");
+                let v = i.values.iter().map(|x| num(*x)).collect::<Vec<_>>().join("/");
                 if v.is_empty() {
                     i.name.clone()
                 } else {
                     format!("{} {}", i.name, v)
                 }
             })
-            .collect::<Vec<_>>()
-            .join(",  ");
-
-        let mut lines: Vec<String> = Vec::new();
-        if !axes.is_empty() {
-            lines.push(format!("Axes        {axes}"));
-        }
-        if !instances.is_empty() {
-            lines.push(format!("Instances   {instances}"));
-        }
-        lines.push(format!(
-            "Character   {} glyphs · {} encoded · {} upm",
-            self.facts.glyph_count, self.facts.encoded, self.facts.upm
-        ));
-        if !self.facts.features.is_empty() {
-            lines.push(format!("Features    {}", self.facts.features.join(", ")));
-        }
+            .collect();
+        let character = vec![
+            format!("{} glyphs", self.facts.glyph_count),
+            format!("{} encoded", self.facts.encoded),
+            format!("{} upm", self.facts.upm),
+        ];
+        // features wrapped 2 per line
+        let features: Vec<String> = self
+            .facts
+            .features
+            .chunks(2)
+            .map(|c| c.join(" "))
+            .collect();
+        let mut meta = Vec::new();
         if !self.facts.version.is_empty() {
-            lines.push(format!("Version     {}", self.facts.version));
+            meta.push(format!("version {}", self.facts.version));
         }
-        lines.push(format!("Generated   {}", self.date));
+        if !self.git.is_empty() {
+            meta.push(format!("commit {}", self.git));
+        }
+        if !self.date.is_empty() {
+            meta.push(format!("generated {}", self.date));
+        }
 
-        self.ctx
-            .fill(ink())
-            .clear_font_variations()
-            .font_variation("wght", 400.0)
-            .font_size(12.0)
-            .tracking(0.0)
-            .auto_line_height()
-            .text_align(TextAlign::Left);
-        let mut y = M + (lines.len() as f64 - 1.0) * 18.0;
-        for l in &lines {
-            self.ctx.text(l, M, y);
-            y -= 18.0;
+        self.field(col_x(0), top, "Axes", &axes);
+        self.field(col_x(1), top, "Instances", &instances);
+        self.field(col_x(2), top, "Character", &character);
+        self.field(col_x(3), top, "Features", &features);
+        self.field(col_x(4), top, "Build", &meta);
+    }
+
+    fn char_set(&mut self) {
+        self.new_sheet("Character Set", "Character Set");
+        let cell_w = 46.0;
+        let cell_h = 58.0;
+        let cols = (((W - 2.0 * M) / cell_w).floor() as usize).max(1);
+        let top = H - 104.0;
+        let bottom = M;
+        let glyph_size = cell_h * 0.58;
+
+        let mut col = 0usize;
+        let mut row_top = top;
+        let cmap = self.facts.cmap.clone();
+        for (cp, _gid) in cmap {
+            if cp < 0x20 {
+                continue;
+            }
+            let Some(ch) = char::from_u32(cp) else { continue };
+            if col == 0 && row_top - cell_h < bottom {
+                self.new_sheet("Character Set", "Character Set (cont.)");
+                row_top = top;
+            }
+            let x = M + col as f64 * cell_w;
+            let cx = x + cell_w / 2.0;
+            let base = row_top - cell_h + cell_h * 0.34;
+
+            self.ctx.no_fill().stroke(rule()).stroke_width(0.4);
+            self.ctx.rect(x, row_top - cell_h, cell_w, cell_h);
+
+            self.ctx
+                .no_stroke()
+                .fill(ink())
+                .font(&self.facts.family)
+                .clear_font_variations()
+                .font_variation("wght", 400.0)
+                .font_size(glyph_size)
+                .tracking(0.0)
+                .auto_line_height()
+                .text_align(TextAlign::Center);
+            self.ctx.text(&ch.to_string(), cx, base);
+
+            self.ctx
+                .no_stroke()
+                .font(MONO)
+                .clear_font_variations()
+                .fill(hair())
+                .font_size(5.5)
+                .text_align(TextAlign::Center);
+            self.ctx.text(&format!("{:04X}", cp), cx, row_top - cell_h + 4.0);
+
+            col += 1;
+            if col >= cols {
+                col = 0;
+                row_top -= cell_h;
+            }
         }
     }
 
@@ -337,103 +452,106 @@ impl<'a> Proof<'a> {
             if y - s < M {
                 break;
             }
-            // size label in the gutter, baseline-aligned
-            self.ctx.fill(faint()).font_size(8.0);
+            self.ctx.font(MONO).fill(faint()).font_size(8.0);
             self.ctx.text(&format!("{}", s as i64), M, y);
-            // sample
-            self.ctx.fill(ink()).font_size(s);
+            self.ctx.font(&self.facts.family).fill(ink()).font_size(s);
             self.ctx.text(sample, M + 34.0, y);
             y -= s * 1.26 + 5.0;
         }
     }
 
-    fn glyph_grid(&mut self) {
-        self.new_sheet("Character Set", "Character Set");
-        let cell_w = 46.0;
-        let cell_h = 58.0;
-        let cols = (((W - 2.0 * M) / cell_w).floor() as usize).max(1);
-        let top = H - 104.0;
-        let bottom = M;
-        let glyph_size = cell_h * 0.58;
+    /// A single column of running SAMPLE text at a given size/leading/tracking,
+    /// spanning `span` grid columns from column `start`, with a mono caption.
+    fn text_column(&mut self, start: usize, span: usize, size: f64, leading: f64, track: f64) {
+        let x = col_x(start);
+        let w = span_w(span);
+        let top = H - 100.0;
+        let bh = top - M;
 
-        let mut col = 0usize;
-        let mut row_top = top;
-        // clone to avoid borrowing self.facts across &mut self page breaks
-        let cmap = self.facts.cmap.clone();
-        for (cp, _gid) in cmap {
-            if cp < 0x20 {
-                continue;
-            }
-            let Some(ch) = char::from_u32(cp) else { continue };
-            if col == 0 && row_top - cell_h < bottom {
-                self.new_sheet("Character Set", "Character Set (cont.)");
-                row_top = top;
-            }
-            let x = M + col as f64 * cell_w;
-            let cx = x + cell_w / 2.0;
-            let base = row_top - cell_h + cell_h * 0.34;
+        // mono caption above the column
+        let cap = format!(
+            "{}/{}  ·  tracking {:+.1}",
+            num(size as f32),
+            num(leading as f32),
+            track
+        );
+        self.ctx
+            .no_stroke()
+            .font(MONO)
+            .clear_font_variations()
+            .fill(faint())
+            .font_size(6.5)
+            .tracking(0.4)
+            .auto_line_height()
+            .text_align(TextAlign::Left);
+        self.ctx.text(&cap.to_uppercase(), x, top + 12.0);
 
-            // faint cell frame
-            self.ctx.no_fill().stroke(rule()).stroke_width(0.4);
-            self.ctx.rect(x, row_top - cell_h, cell_w, cell_h);
+        // the text block
+        self.ctx
+            .fill(ink())
+            .font(&self.facts.family)
+            .clear_font_variations()
+            .font_variation("wght", 400.0)
+            .font_size(size)
+            .line_height(leading)
+            .tracking(track)
+            .text_align(TextAlign::Left);
+        self.ctx.text_box(&filled(1400), x, M, w, bh);
+    }
 
-            // glyph
-            self.ctx
-                .no_stroke()
-                .fill(ink())
-                .font(&self.facts.family)
-                .clear_font_variations()
-                .font_variation("wght", 400.0)
-                .font_size(glyph_size)
-                .tracking(0.0)
-                .auto_line_height()
-                .text_align(TextAlign::Center);
-            self.ctx.text(&ch.to_string(), cx, base);
+    /// Three columns at ascending reading sizes with matched leading.
+    fn text_sizes(&mut self) {
+        self.new_sheet("Text · Reading Sizes", "Text — Reading Sizes");
+        self.text_column(0, 2, 8.5, 12.0, 0.0);
+        self.text_column(2, 2, 10.0, 14.5, 0.0);
+        self.text_column(4, 2, 12.5, 17.5, 0.0);
+    }
 
-            // hex label
-            self.ctx.fill(hair()).font_size(5.5);
-            self.ctx.text(&format!("{:04X}", cp), cx, row_top - cell_h + 4.0);
+    /// Same size, three leadings — the effect of line spacing on color.
+    fn text_leading(&mut self) {
+        self.new_sheet("Text · Leading", "Text — Leading");
+        self.text_column(0, 2, 10.0, 12.0, 0.0);
+        self.text_column(2, 2, 10.0, 14.5, 0.0);
+        self.text_column(4, 2, 10.0, 17.5, 0.0);
+    }
 
-            col += 1;
-            if col >= cols {
-                col = 0;
-                row_top -= cell_h;
-            }
-        }
+    /// Same size/leading, three tracking values — tighter to looser.
+    fn text_tracking(&mut self) {
+        self.new_sheet("Text · Tracking", "Text — Tracking");
+        self.text_column(0, 2, 10.5, 15.0, -0.4);
+        self.text_column(2, 2, 10.5, 15.0, 0.0);
+        self.text_column(4, 2, 10.5, 15.0, 0.6);
     }
 }
 
-/// Best-effort ISO date (YYYY-MM-DD) via the system `date`; empty on failure.
-fn today() -> String {
-    std::process::Command::new("date")
-        .arg("+%Y-%m-%d")
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_default()
-}
-
 /// Generate the default print proof for `font_path`, writing a PDF to
-/// `output_path`. Introspects the font and lays out the proof pages; the PDF is
-/// sRGB color-managed by the renderer's PDF backend.
-pub fn generate_proof(font_path: &Path, output_path: &str) -> Result<(), DesignBotError> {
+/// `output_path`. `grid` overlays the Swiss guide grid on every page.
+pub fn generate_proof(
+    font_path: &Path,
+    output_path: &str,
+    grid: bool,
+) -> Result<(), DesignBotError> {
     let data = std::fs::read(font_path).map_err(DesignBotError::IOError)?;
     let facts = introspect(&data)?;
 
     let mut r = Renderer::new(W as u32, H as u32);
     r.load_font(font_path)?;
+    r.load_font_data(MONO_TTF.to_vec());
 
     let mut proof = Proof {
         ctx: Canvas::new(W, H),
         facts: &facts,
         date: today(),
+        git: git_hash(font_path),
         folio: 1,
+        grid,
     };
     proof.cover();
-    proof.glyph_grid();
+    proof.char_set();
     proof.waterfall();
+    proof.text_sizes();
+    proof.text_leading();
+    proof.text_tracking();
 
     r.render_to_pdf(&proof.ctx, output_path)?;
     Ok(())
