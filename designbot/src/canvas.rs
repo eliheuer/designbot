@@ -61,6 +61,7 @@ pub enum DrawCommand {
         letter_spacing: f64,
         align: TextAlign,
         variations: Vec<(u32, f32)>,
+        features: Vec<(u32, u16)>,
         brush: Brush,
         stroke_brush: Option<Brush>,
         stroke_width: f64,
@@ -78,6 +79,7 @@ pub enum DrawCommand {
         letter_spacing: f64,
         align: TextAlign,
         variations: Vec<(u32, f32)>,
+        features: Vec<(u32, u16)>,
         brush: Brush,
         stroke_brush: Option<Brush>,
         stroke_width: f64,
@@ -484,6 +486,7 @@ impl Canvas {
                 letter_spacing: state.letter_spacing,
                 align: state.text_align,
                 variations: state.font_variations.clone(),
+                features: state.font_features.clone(),
                 brush: Brush::Solid(fill_color.to_peniko()),
                 stroke_brush: state.stroke_color.map(|c| Brush::Solid(c.to_peniko())),
                 stroke_width: state.stroke_width,
@@ -513,6 +516,7 @@ impl Canvas {
                 letter_spacing: state.letter_spacing,
                 align: state.text_align,
                 variations: state.font_variations.clone(),
+                features: state.font_features.clone(),
                 brush: Brush::Solid(fill_color.to_peniko()),
                 stroke_brush: state.stroke_color.map(|c| Brush::Solid(c.to_peniko())),
                 stroke_width: state.stroke_width,
@@ -540,6 +544,27 @@ impl Canvas {
     /// Clear all variable-font axis settings.
     pub fn clear_font_variations(&mut self) -> &mut Self {
         self.state.current_mut().font_variations.clear();
+        self
+    }
+
+    /// Set an OpenType feature (e.g. `"kern"`, `0` to disable; `"tnum"`, `1` to
+    /// enable). Repeated calls set additional features; a later call for the
+    /// same tag overrides the earlier value. Applies to subsequent
+    /// `text`/`text_box` calls.
+    pub fn font_feature(&mut self, tag: &str, value: u16) -> &mut Self {
+        let tag = pack_tag(tag);
+        let features = &mut self.state.current_mut().font_features;
+        if let Some(existing) = features.iter_mut().find(|(t, _)| *t == tag) {
+            existing.1 = value;
+        } else {
+            features.push((tag, value));
+        }
+        self
+    }
+
+    /// Clear all OpenType feature settings.
+    pub fn clear_font_features(&mut self) -> &mut Self {
+        self.state.current_mut().font_features.clear();
         self
     }
 

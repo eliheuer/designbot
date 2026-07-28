@@ -24,7 +24,7 @@ use kurbo::Shape;
 use color::AlphaColor;
 use peniko::Fill;
 use parley::{FontContext, LayoutContext, layout::PositionedLayoutItem};
-use parley::style::{FontFamily, FontSettings, FontStack, FontVariation, StyleProperty};
+use parley::style::{FontFamily, FontFeature, FontSettings, FontStack, FontVariation, StyleProperty};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::path::Path;
@@ -619,12 +619,13 @@ impl Renderer {
                 letter_spacing,
                 align,
                 variations,
+                features,
                 brush,
                 stroke_brush,
                 stroke_width,
                 transform,
             } => {
-                Self::render_text(painter, text, *x, *y, None, font_family.as_deref(), *font_size, *line_height, *letter_spacing, *align, variations, brush, stroke_brush.as_ref(), *stroke_width, transform, font_cx);
+                Self::render_text(painter, text, *x, *y, None, font_family.as_deref(), *font_size, *line_height, *letter_spacing, *align, variations, features, brush, stroke_brush.as_ref(), *stroke_width, transform, font_cx);
             }
             DrawCommand::DrawTextBox {
                 text,
@@ -638,12 +639,13 @@ impl Renderer {
                 letter_spacing,
                 align,
                 variations,
+                features,
                 brush,
                 stroke_brush,
                 stroke_width,
                 transform,
             } => {
-                Self::render_text(painter, text, *x, *y, Some((*width, *height)), font_family.as_deref(), *font_size, *line_height, *letter_spacing, *align, variations, brush, stroke_brush.as_ref(), *stroke_width, transform, font_cx);
+                Self::render_text(painter, text, *x, *y, Some((*width, *height)), font_family.as_deref(), *font_size, *line_height, *letter_spacing, *align, variations, features, brush, stroke_brush.as_ref(), *stroke_width, transform, font_cx);
             }
             DrawCommand::DrawImage {
                 data,
@@ -807,6 +809,7 @@ impl Renderer {
         letter_spacing: f64,
         align: designbot_core::canvas::TextAlign,
         variations: &[(u32, f32)],
+        features: &[(u32, u16)],
         brush: &peniko::Brush,
         stroke_brush: Option<&peniko::Brush>,
         stroke_width: f64,
@@ -852,6 +855,20 @@ impl Renderer {
                 })
                 .collect();
             builder.push_default(StyleProperty::FontVariations(FontSettings::List(
+                Cow::Owned(settings),
+            )));
+        }
+
+        // Apply OpenType feature settings, if any (e.g. kern off, tnum on).
+        if !features.is_empty() {
+            let settings: Vec<FontFeature> = features
+                .iter()
+                .map(|(tag, value)| FontFeature {
+                    tag: *tag,
+                    value: *value,
+                })
+                .collect();
+            builder.push_default(StyleProperty::FontFeatures(FontSettings::List(
                 Cow::Owned(settings),
             )));
         }

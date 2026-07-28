@@ -280,11 +280,36 @@ impl<'a> Proof<'a> {
         self.folio += 1;
         self.ctx.new_page();
         self.ctx.background(paper());
+        self.ctx.clear_font_features(); // pages start feature-free
         if self.grid {
             self.grid_overlay();
         }
         self.running_head(section);
         self.page_title(title);
+    }
+
+    /// A small monospace caption (gray, letter-spaced caps).
+    fn mono_caption(&mut self, text: &str, x: f64, y: f64) {
+        self.ctx
+            .no_stroke()
+            .font(MONO)
+            .clear_font_variations()
+            .clear_font_features()
+            .fill(faint())
+            .font_size(6.5)
+            .tracking(0.5)
+            .auto_line_height()
+            .text_align(TextAlign::Left);
+        self.ctx.text(&text.to_uppercase(), x, y);
+    }
+
+    /// The wght axis (min, default, max), if present.
+    fn wght_range(&self) -> Option<(f32, f32, f32)> {
+        self.facts
+            .axes
+            .iter()
+            .find(|a| a.tag == "wght")
+            .map(|a| (a.min, a.default, a.max))
     }
 
     /// A monospace field: tiny gray caps label + stacked value lines.
@@ -532,6 +557,252 @@ impl<'a> Proof<'a> {
         self.text_column(2, 2, 10.5, 15.0, 0.0);
         self.text_column(4, 2, 10.5, 15.0, 0.6);
     }
+
+    /// Spacing proof — control strings with kerning OFF, so raw sidebearings
+    /// are what you judge. Each letter is set between its category's controls
+    /// (H/O for caps, n/o for lowercase, 0/1 for figures).
+    fn spacing(&mut self) {
+        self.new_sheet("Spacing", "Spacing — kerning off");
+        let fam = self.fam();
+        // Each letter set between its controls on both sides (H/O, n/o, 0/1),
+        // so both sidebearings read at a glance. Kerning + ligatures off.
+        let caps: String = ('A'..='Z').map(|c| format!("H{c}HO{c}O ")).collect();
+        let lc: String = ('a'..='z').map(|c| format!("n{c}no{c}o ")).collect();
+        let digs: String = ('0'..='9').map(|c| format!("0{c}01{c}1 ")).collect();
+        let w = W - 2.0 * M;
+        // Fixed, well-separated group positions (text_box does not clip height).
+        let groups = [("Capitals", caps, H - 116.0), ("Lowercase", lc, H - 268.0), ("Figures", digs, H - 420.0)];
+        for (label, s, cap_y) in groups {
+            self.mono_caption(label, M, cap_y);
+            self.ctx
+                .no_stroke()
+                .fill(ink())
+                .font(&fam)
+                .clear_font_variations()
+                .font_variation("wght", 400.0)
+                .clear_font_features()
+                .font_feature("kern", 0)
+                .font_feature("liga", 0)
+                .font_size(18.0)
+                .line_height(25.0)
+                .tracking(0.0)
+                .text_align(TextAlign::Left);
+            self.ctx.text_box(&s, M, cap_y - 130.0, w, 118.0);
+        }
+    }
+
+    /// Figures — proportional vs tabular (tnum), a tabular column-alignment
+    /// test, and currency.
+    fn figures(&mut self) {
+        self.new_sheet("Figures", "Figures & Numerals");
+        let fam = self.fam();
+        let digits = "0 1 2 3 4 5 6 7 8 9";
+
+        // Proportional (default) vs tabular (tnum) at display size.
+        self.mono_caption("Proportional (default)", M, H - 116.0);
+        self.set_body(&fam, 38.0);
+        self.ctx.clear_font_features();
+        self.ctx.text(digits, M, H - 160.0);
+
+        self.mono_caption("Tabular (tnum)", M, H - 208.0);
+        self.set_body(&fam, 38.0);
+        self.ctx.clear_font_features().font_feature("tnum", 1);
+        self.ctx.text(digits, M, H - 252.0);
+
+        // Tabular column test: a right-aligned price stack; with tnum every
+        // figure is the same width so decimals line up.
+        let prices = "1,204.50\n38.05\n1,899,000.00\n7.25\n640.80";
+        self.mono_caption("Tabular column · decimals align", col_x(4), H - 116.0);
+        self.set_body(&fam, 16.0);
+        self.ctx
+            .clear_font_features()
+            .font_feature("tnum", 1)
+            .line_height(22.0)
+            .text_align(TextAlign::Right);
+        self.ctx.text_box(prices, col_x(4), H - 300.0, span_w(2), 170.0);
+
+        // Currency.
+        self.mono_caption("Currency", M, M + 84.0);
+        self.set_body(&fam, 26.0);
+        self.ctx.clear_font_features();
+        self.ctx.text("$1,234.56  €1,234.56  £1,234.56  ¥1,234  ¢99", M, M + 44.0);
+    }
+
+    /// Accents & diacritics — composed letters in lowercase and caps, plus real
+    /// words, to check mark placement and cap-height vs lowercase accents.
+    fn accents(&mut self) {
+        self.new_sheet("Diacritics", "Accents & Diacritics");
+        let fam = self.fam();
+        let lc = [
+            "à á â ã ä å ā ă ą",
+            "è é ê ë ē ĕ ė ę ě",
+            "ì í î ï ĩ ī ĭ į ı",
+            "ò ó ô õ ö ø ō ŏ ő",
+            "ù ú û ü ũ ū ŭ ů ű",
+            "ç ć ĉ ċ č   ñ ń ņ ň   š ś ş   ž ź ż   ý ÿ   ł đ",
+        ];
+        let uc = [
+            "À Á Â Ã Ä Å Ā Ă Ą",
+            "È É Ê Ë Ē Ĕ Ė Ę Ě",
+            "Ò Ó Ô Õ Ö Ø   Ç Ć Č   Ñ Ń Ň   Š Ž Ý",
+        ];
+        let words = "café · résumé · naïve · Zürich · Škoda · piñata · œuvre · Straße";
+
+        let mut y = H - 116.0;
+        self.mono_caption("Lowercase", M, y);
+        y -= 30.0;
+        for row in lc {
+            self.set_body(&fam, 24.0);
+            self.ctx.text(row, M, y);
+            y -= 34.0;
+        }
+        y -= 12.0;
+        self.mono_caption("Capitals", M, y);
+        y -= 30.0;
+        for row in uc {
+            self.set_body(&fam, 24.0);
+            self.ctx.text(row, M, y);
+            y -= 34.0;
+        }
+        y -= 12.0;
+        self.mono_caption("In words", M, y);
+        y -= 28.0;
+        self.set_body(&fam, 22.0);
+        self.ctx.text(words, M, y);
+    }
+
+    /// Kerning — classic problem pairs (kern on), then the same words set with
+    /// kerning off and on so pair adjustments are directly visible.
+    fn kerning(&mut self) {
+        self.new_sheet("Kerning", "Kerning");
+        let fam = self.fam();
+        let pairs = [
+            "AV AW AY AT AU VA WA YA",
+            "To Ta Te Tr Tu Ty Tw",
+            "Yo Ya Ve Vo We Wo Pa",
+            "r. r, y. y, w, f) P. F.",
+        ];
+        let mut y = H - 118.0;
+        self.mono_caption("Problem pairs · kerning on", M, y);
+        y -= 34.0;
+        for row in pairs {
+            self.set_body(&fam, 30.0);
+            self.ctx.clear_font_features(); // kern on (default)
+            self.ctx.text(row, M, y);
+            y -= 40.0;
+        }
+
+        let words = "Toronto  Affinity  Voyage  Water  Yellow  LAWYER";
+        y -= 16.0;
+        self.mono_caption("Kerning off", M, y);
+        y -= 32.0;
+        self.set_body(&fam, 26.0);
+        self.ctx.clear_font_features().font_feature("kern", 0);
+        self.ctx.text(words, M, y);
+        y -= 44.0;
+        self.mono_caption("Kerning on", M, y);
+        y -= 32.0;
+        self.set_body(&fam, 26.0);
+        self.ctx.clear_font_features();
+        self.ctx.text(words, M, y);
+    }
+
+    /// Weight waterfall — the same line at every step of the wght axis, same
+    /// size, to read the weight progression and spot interpolation kinks.
+    fn weight_waterfall(&mut self) {
+        self.new_sheet("Weight", "Weight Waterfall");
+        let fam = self.fam();
+        let sample = "Hamburgefonstiv 0123";
+        let size = 38.0;
+        let Some((min, _def, max)) = self.wght_range() else {
+            return;
+        };
+        let steps = 7usize;
+        let mut y = H - 150.0;
+        for i in 0..steps {
+            let wght = min + (max - min) * (i as f64 / (steps - 1) as f64) as f32;
+            self.ctx.font(MONO).clear_font_variations().clear_font_features();
+            self.ctx.fill(faint()).font_size(8.0).text_align(TextAlign::Left);
+            self.ctx.text(&format!("{}", wght.round() as i64), M, y);
+            self.ctx
+                .font(&fam)
+                .clear_font_variations()
+                .font_variation("wght", wght)
+                .fill(ink())
+                .font_size(size)
+                .tracking(0.0)
+                .auto_line_height();
+            self.ctx.text(sample, M + 44.0, y);
+            y -= size * 1.32 + 4.0;
+        }
+    }
+
+    /// Interpolation grid — each test glyph shown across the wght axis so kinks,
+    /// reversals, and drifting overshoots jump out (glyph rows × weight columns).
+    fn interpolation(&mut self) {
+        self.new_sheet("Interpolation", "Interpolation");
+        let fam = self.fam();
+        let glyphs = ['o', 'n', 'H', 'a', 'e', 'g', 'R', '&', '2', '@'];
+        let Some((min, _def, max)) = self.wght_range() else {
+            return;
+        };
+        let ncols = 6usize;
+        let content_w = W - 2.0 * M;
+        let cell_w = content_w / ncols as f64;
+        let top = H - 132.0;
+        let row_h = (top - M) / glyphs.len() as f64;
+        let gsize = (row_h * 0.62).min(cell_w * 0.5);
+
+        // weight column headers
+        for c in 0..ncols {
+            let wght = min + (max - min) * (c as f64 / (ncols - 1) as f64) as f32;
+            let cx = M + c as f64 * cell_w + cell_w / 2.0;
+            self.ctx
+                .no_stroke()
+                .font(MONO)
+                .clear_font_variations()
+                .clear_font_features()
+                .fill(faint())
+                .font_size(7.0)
+                .tracking(0.3)
+                .text_align(TextAlign::Center);
+            self.ctx.text(&format!("{}", wght.round() as i64), cx, top + 10.0);
+        }
+
+        for (r, &ch) in glyphs.iter().enumerate() {
+            let cy_top = top - r as f64 * row_h;
+            let base = cy_top - row_h + row_h * 0.30;
+            for c in 0..ncols {
+                let wght = min + (max - min) * (c as f64 / (ncols - 1) as f64) as f32;
+                let cx = M + c as f64 * cell_w + cell_w / 2.0;
+                self.ctx
+                    .no_stroke()
+                    .fill(ink())
+                    .font(&fam)
+                    .clear_font_variations()
+                    .font_variation("wght", wght)
+                    .font_size(gsize)
+                    .tracking(0.0)
+                    .auto_line_height()
+                    .text_align(TextAlign::Center);
+                self.ctx.text(&ch.to_string(), cx, base);
+            }
+        }
+    }
+
+    /// Shared body-text setup for the diacritic/kerning rows.
+    fn set_body(&mut self, fam: &str, size: f64) {
+        self.ctx
+            .no_stroke()
+            .fill(ink())
+            .font(fam)
+            .clear_font_variations()
+            .font_variation("wght", 400.0)
+            .font_size(size)
+            .tracking(0.0)
+            .auto_line_height()
+            .text_align(TextAlign::Left);
+    }
 }
 
 /// Generate the default print proof for `font_path`, writing a PDF to
@@ -562,6 +833,12 @@ pub fn generate_proof(
     proof.text_sizes();
     proof.text_leading();
     proof.text_tracking();
+    proof.spacing();
+    proof.figures();
+    proof.accents();
+    proof.kerning();
+    proof.weight_waterfall();
+    proof.interpolation();
 
     r.render_to_pdf(&proof.ctx, output_path)?;
     Ok(())

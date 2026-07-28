@@ -29,6 +29,9 @@ pub struct GraphicsState {
     /// Active variable-font axis settings as (tag, value) pairs, where `tag` is
     /// the 4-byte OpenType axis tag packed big-endian (e.g. `wght`).
     pub font_variations: Vec<(u32, f32)>,
+    /// Active OpenType feature settings as (tag, value) pairs, `tag` packed
+    /// big-endian (e.g. `kern`); value 0 disables, 1 enables.
+    pub font_features: Vec<(u32, u16)>,
 }
 
 impl Default for GraphicsState {
@@ -49,6 +52,7 @@ impl Default for GraphicsState {
             letter_spacing: 0.0,
             text_align: TextAlign::default(),
             font_variations: Vec::new(),
+            font_features: Vec::new(),
         }
     }
 }
