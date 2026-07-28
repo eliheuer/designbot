@@ -20,6 +20,11 @@ pub struct GraphicsState {
     pub transform: kurbo::Affine,
     pub font_family: Option<String>,
     pub font_size: f64,
+    /// Absolute line height in points (DrawBot `lineHeight`), baseline to
+    /// baseline. `None` uses the font's natural metrics.
+    pub line_height: Option<f64>,
+    /// Letter spacing / tracking in points (DrawBot `tracking`); 0 = none.
+    pub letter_spacing: f64,
     pub text_align: TextAlign,
     /// Active variable-font axis settings as (tag, value) pairs, where `tag` is
     /// the 4-byte OpenType axis tag packed big-endian (e.g. `wght`).
@@ -40,6 +45,8 @@ impl Default for GraphicsState {
             transform: kurbo::Affine::IDENTITY,
             font_family: None,
             font_size: 12.0,
+            line_height: None,
+            letter_spacing: 0.0,
             text_align: TextAlign::default(),
             font_variations: Vec::new(),
         }

@@ -577,12 +577,14 @@ impl Renderer {
                 y,
                 font_family,
                 font_size,
+                line_height,
+                letter_spacing,
                 align,
                 variations,
                 brush,
                 transform,
             } => {
-                Self::render_text(painter, text, *x, *y, None, font_family.as_deref(), *font_size, *align, variations, brush, transform, font_cx);
+                Self::render_text(painter, text, *x, *y, None, font_family.as_deref(), *font_size, *line_height, *letter_spacing, *align, variations, brush, transform, font_cx);
             }
             DrawCommand::DrawTextBox {
                 text,
@@ -592,12 +594,14 @@ impl Renderer {
                 height,
                 font_family,
                 font_size,
+                line_height,
+                letter_spacing,
                 align,
                 variations,
                 brush,
                 transform,
             } => {
-                Self::render_text(painter, text, *x, *y, Some((*width, *height)), font_family.as_deref(), *font_size, *align, variations, brush, transform, font_cx);
+                Self::render_text(painter, text, *x, *y, Some((*width, *height)), font_family.as_deref(), *font_size, *line_height, *letter_spacing, *align, variations, brush, transform, font_cx);
             }
             DrawCommand::DrawImage {
                 data,
@@ -757,6 +761,8 @@ impl Renderer {
         bounds: Option<(f64, f64)>, // (width, height) for text_box
         font_family: Option<&str>,
         font_size: f64,
+        line_height: Option<f64>,
+        letter_spacing: f64,
         align: designbot_core::canvas::TextAlign,
         variations: &[(u32, f32)],
         brush: &peniko::Brush,
@@ -778,6 +784,19 @@ impl Renderer {
 
         // Set font size
         builder.push_default(StyleProperty::FontSize(font_size as f32));
+
+        // Line height: DrawBot's is an absolute point value baseline-to-baseline;
+        // parley's LineHeight is a multiplier of the font size, so convert.
+        if let Some(lh) = line_height {
+            if font_size > 0.0 {
+                builder.push_default(StyleProperty::LineHeight((lh / font_size) as f32));
+            }
+        }
+
+        // Letter spacing / tracking (absolute points, matches parley's units).
+        if letter_spacing != 0.0 {
+            builder.push_default(StyleProperty::LetterSpacing(letter_spacing as f32));
+        }
 
         // Apply variable-font axis settings, if any.
         if !variations.is_empty() {

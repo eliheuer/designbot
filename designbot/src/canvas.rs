@@ -57,6 +57,8 @@ pub enum DrawCommand {
         y: f64,
         font_family: Option<String>,
         font_size: f64,
+        line_height: Option<f64>,
+        letter_spacing: f64,
         align: TextAlign,
         variations: Vec<(u32, f32)>,
         brush: Brush,
@@ -70,6 +72,8 @@ pub enum DrawCommand {
         height: f64,
         font_family: Option<String>,
         font_size: f64,
+        line_height: Option<f64>,
+        letter_spacing: f64,
         align: TextAlign,
         variations: Vec<(u32, f32)>,
         brush: Brush,
@@ -434,6 +438,26 @@ impl Canvas {
         self
     }
 
+    /// Set the line height (baseline-to-baseline) in points, like DrawBot
+    /// `lineHeight`. Applies to subsequent `text`/`text_box`. Set it to a
+    /// powers-of-two value to keep multi-line baselines on the grid.
+    pub fn line_height(&mut self, value: f64) -> &mut Self {
+        self.state.current_mut().line_height = Some(value);
+        self
+    }
+
+    /// Reset the line height to the font's natural metrics.
+    pub fn auto_line_height(&mut self) -> &mut Self {
+        self.state.current_mut().line_height = None;
+        self
+    }
+
+    /// Set letter spacing / tracking in points, like DrawBot `tracking`.
+    pub fn tracking(&mut self, value: f64) -> &mut Self {
+        self.state.current_mut().letter_spacing = value;
+        self
+    }
+
     /// Set the text alignment
     pub fn text_align(&mut self, align: TextAlign) -> &mut Self {
         self.state.current_mut().text_align = align;
@@ -452,6 +476,8 @@ impl Canvas {
                 y,
                 font_family: state.font_family.clone(),
                 font_size: state.font_size,
+                line_height: state.line_height,
+                letter_spacing: state.letter_spacing,
                 align: state.text_align,
                 variations: state.font_variations.clone(),
                 brush: Brush::Solid(fill_color.to_peniko()),
@@ -477,6 +503,8 @@ impl Canvas {
                 height,
                 font_family: state.font_family.clone(),
                 font_size: state.font_size,
+                line_height: state.line_height,
+                letter_spacing: state.letter_spacing,
                 align: state.text_align,
                 variations: state.font_variations.clone(),
                 brush: Brush::Solid(fill_color.to_peniko()),
