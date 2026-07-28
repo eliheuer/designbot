@@ -374,32 +374,55 @@ impl<'a> Proof<'a> {
             self.grid_overlay();
         }
 
-        // Family name — regular weight, generous tracking, sized to fill the
-        // content width, and vertically centered in the top grid row so the
-        // space above the caps equals the space below (top margin == sides).
+        // Weight waterfall of the family name: one 100-unit wght step per grid
+        // row, top (min) to bottom (max), tightly (negatively) tracked. Sized to
+        // fit a grid row's height, capped so the heaviest row never overflows
+        // the content width.
+        let fam = self.fam();
         let target = W - 2.0 * M;
-        let gaps = (self.facts.family.chars().count().saturating_sub(1)) as f64;
-        let track_frac = 0.12; // a lot of tracking at display size
-        let size = (target / (self.name_w_100 / 100.0 + track_frac * gaps)).min(96.0);
+        let gaps = (fam.chars().count().saturating_sub(1)) as f64;
+        let track_frac = -0.025; // tight, negative tracking at display size
+        let size_h = grid_rh() * 0.80;
+        let size_w = target / (self.name_w_100 / 100.0 + track_frac * gaps);
+        let size = size_h.min(size_w);
         let track = track_frac * size;
         let cap_px = size * self.facts.cap_height as f64 / self.facts.upm as f64;
-        let top_row = GRID_ROWS - 1;
-        let cell_center = (grid_row_bottom(top_row) + grid_row_top(top_row)) / 2.0;
-        let baseline = cell_center - cap_px / 2.0;
-        self.ctx
-            .no_stroke()
-            .fill(ink())
-            .font(&self.facts.family)
-            .clear_font_variations()
-            .font_variation("wght", 400.0)
-            .font_size(size)
-            .tracking(track)
-            .auto_line_height()
-            .text_align(TextAlign::Left);
-        self.ctx.text(&self.facts.family, M, baseline);
 
-        // Technical data — monospace columns; bars snapped to a grid line.
-        let bar_y = grid_row_top(1);
+        // weights stepped by 100 across the wght axis (default 400 if no axis)
+        let weights: Vec<f32> = match self.wght_range() {
+            Some((min, _, max)) => {
+                let mut v = Vec::new();
+                let mut w = min;
+                while w <= max + 0.5 {
+                    v.push(w);
+                    w += 100.0;
+                }
+                v
+            }
+            None => vec![self.facts.axes.first().map(|a| a.default).unwrap_or(400.0)],
+        };
+        // top four grid rows (indices 5..=2); row 1 is skipped, row 0 holds the
+        // column values.
+        for (i, &w) in weights.iter().take(4).enumerate() {
+            let r = (GRID_ROWS - 1) - i as u32;
+            let center = (grid_row_bottom(r) + grid_row_top(r)) / 2.0;
+            let baseline = center - cap_px / 2.0;
+            self.ctx
+                .no_stroke()
+                .fill(ink())
+                .font(&fam)
+                .clear_font_variations()
+                .font_variation("wght", w)
+                .font_size(size)
+                .tracking(track)
+                .auto_line_height()
+                .text_align(TextAlign::Left);
+            self.ctx.text(&fam, M, baseline);
+        }
+
+        // Technical data columns at the bottom: title + bar on the bottom edge
+        // of grid row 5 (index 1), values filling grid row 6 (index 0).
+        let bar_y = grid_row_bottom(1);
         let axes: Vec<String> = self
             .facts
             .axes
@@ -870,7 +893,9 @@ pub fn generate_proof(
     let mut r = Renderer::new(W as u32, H as u32);
     r.load_font(font_path)?;
     r.load_font_data(MONO_TTF.to_vec());
-    let name_w_100 = r.text_width(&facts.family, Some(&facts.family), 100.0, &[]);
+    // widest weight sets the fit, so the heaviest waterfall row never overflows
+    let wght_tag = u32::from_be_bytes(*b"wght");
+    let name_w_100 = r.text_width(&facts.family, Some(&facts.family), 100.0, &[(wght_tag, 700.0)]);
 
     let mut proof = Proof {
         ctx: Canvas::new(W, H),
