@@ -258,14 +258,15 @@ impl<'a> Proof<'a> {
         self.ctx.line(M, y - 7.0, W - M, y - 7.0);
     }
 
-    /// Page title under the running head (proofed font, semibold).
+    /// Page title under the running head (proofed font, regular weight — the
+    /// proof only sets Bold where it is deliberately showing Bold).
     fn page_title(&mut self, title: &str) {
         self.ctx
             .no_stroke()
             .fill(ink())
             .font(&self.facts.family)
             .clear_font_variations()
-            .font_variation("wght", 600.0)
+            .font_variation("wght", 400.0)
             .font_size(20.0)
             .tracking(0.0)
             .auto_line_height()
