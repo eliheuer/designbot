@@ -25,6 +25,8 @@ pub struct Theme {
     pub rule: Color,
     /// Drawing pen for technical figures (glyph outline, dimension lines).
     pub pen: Color,
+    /// Subtle line color for design [`Grid`](crate::grid::Grid) overlays.
+    pub grid: Color,
     // shared semantic hues
     pub green: Color,
     pub red: Color,
@@ -55,11 +57,12 @@ impl Theme {
         let (green, red, yellow, orange, blue, purple) = hues();
         Theme {
             name: "dark",
-            ground: Color::rgb(0x1a, 0x1a, 0x1a),
+            ground: Color::rgb(0x28, 0x28, 0x28),
             ink: Color::rgb(0xbe, 0xbe, 0xbe),
             furniture: Color::rgb(0x92, 0x92, 0x8e),
             rule: Color::rgb(0x3a, 0x3a, 0x3a),
             pen: Color::rgb(0xe6, 0xe6, 0xe6),
+            grid: Color::rgba(0xff, 0xff, 0xff, 0x22),
             green, red, yellow, orange, blue, purple,
             accent: yellow,
         }
@@ -75,6 +78,7 @@ impl Theme {
             furniture: Color::rgb(0x6a, 0x6a, 0x66),
             rule: Color::rgb(0xd6, 0xd5, 0xd0),
             pen: Color::rgb(0x10, 0x10, 0x10),
+            grid: Color::rgba(0x00, 0x00, 0x00, 0x1e),
             green, red, yellow, orange, blue, purple,
             accent: red,
         }
