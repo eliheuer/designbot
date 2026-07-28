@@ -381,31 +381,43 @@ impl<'a> Proof<'a> {
 
     fn char_set(&mut self) {
         self.new_sheet("Character Set", "Character Set");
-        let cell_w = 46.0;
-        let cell_h = 58.0;
-        let cols = (((W - 2.0 * M) / cell_w).floor() as usize).max(1);
+        let glyphs: Vec<u32> = self
+            .facts
+            .cmap
+            .iter()
+            .map(|&(cp, _)| cp)
+            .filter(|&cp| cp >= 0x20 && char::from_u32(cp).is_some())
+            .collect();
+        let count = glyphs.len().max(1);
+
+        let content_w = W - 2.0 * M;
         let top = H - 104.0;
-        let bottom = M;
-        let glyph_size = cell_h * 0.58;
+        let content_h = top - M;
 
-        let mut col = 0usize;
-        let mut row_top = top;
-        let cmap = self.facts.cmap.clone();
-        for (cp, _gid) in cmap {
-            if cp < 0x20 {
-                continue;
-            }
-            let Some(ch) = char::from_u32(cp) else { continue };
-            if col == 0 && row_top - cell_h < bottom {
-                self.new_sheet("Character Set", "Character Set (cont.)");
-                row_top = top;
-            }
+        // Columns are a multiple of the layout grid (COLS) so cells fill the
+        // page width exactly and align to it; pick the multiple whose cells
+        // come out closest to square. Rows then follow, and the cell height is
+        // derived to fit every glyph on this one page.
+        let ncols = {
+            let ideal = (1.5 * count as f64).sqrt() / COLS as f64;
+            (ideal.round().max(1.0) as usize * COLS).max(COLS)
+        };
+        let nrows = count.div_ceil(ncols);
+        let cell_w = content_w / ncols as f64;
+        let cell_h = content_h / nrows as f64;
+        let glyph_size = (cell_h * 0.52).min(cell_w * 0.72);
+        let labels = cell_h >= 20.0;
+
+        for (idx, &cp) in glyphs.iter().enumerate() {
+            let ch = char::from_u32(cp).unwrap();
+            let col = idx % ncols;
+            let row = idx / ncols;
             let x = M + col as f64 * cell_w;
+            let cell_bottom = top - (row + 1) as f64 * cell_h;
             let cx = x + cell_w / 2.0;
-            let base = row_top - cell_h + cell_h * 0.34;
 
-            self.ctx.no_fill().stroke(rule()).stroke_width(0.4);
-            self.ctx.rect(x, row_top - cell_h, cell_w, cell_h);
+            self.ctx.no_fill().stroke(rule()).stroke_width(0.3);
+            self.ctx.rect(x, cell_bottom, cell_w, cell_h);
 
             self.ctx
                 .no_stroke()
@@ -417,21 +429,18 @@ impl<'a> Proof<'a> {
                 .tracking(0.0)
                 .auto_line_height()
                 .text_align(TextAlign::Center);
+            let base = cell_bottom + if labels { cell_h * 0.40 } else { cell_h * 0.32 };
             self.ctx.text(&ch.to_string(), cx, base);
 
-            self.ctx
-                .no_stroke()
-                .font(MONO)
-                .clear_font_variations()
-                .fill(hair())
-                .font_size(5.5)
-                .text_align(TextAlign::Center);
-            self.ctx.text(&format!("{:04X}", cp), cx, row_top - cell_h + 4.0);
-
-            col += 1;
-            if col >= cols {
-                col = 0;
-                row_top -= cell_h;
+            if labels {
+                self.ctx
+                    .no_stroke()
+                    .font(MONO)
+                    .clear_font_variations()
+                    .fill(hair())
+                    .font_size(4.5)
+                    .text_align(TextAlign::Center);
+                self.ctx.text(&format!("{:04X}", cp), cx, cell_bottom + 2.5);
             }
         }
     }
