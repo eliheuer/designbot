@@ -1012,8 +1012,16 @@ impl Renderer {
 
                             // Calculate glyph position
                             // Use adjusted x (for single-line alignment), line alignment offset (for text_box), and glyph offset
-                            let glyph_x = adjusted_x + line_x_offset + glyph_x_offset as f64;
-                            let glyph_y = line_y;
+                            // glyph.x / glyph.y carry the shaper's per-glyph
+                            // placement (GPOS mark attachment and cursive
+                            // rises — essential for Arabic, vital for
+                            // Nastaliq). User space is y-up, same sign as the
+                            // shaper's, so they add directly.
+                            let glyph_x = adjusted_x
+                                + line_x_offset
+                                + glyph_x_offset as f64
+                                + glyph.x as f64;
+                            let glyph_y = line_y + glyph.y as f64;
 
                             // Font glyphs are y-up, exactly like DrawBot user
                             // space; the command transform already carries the
