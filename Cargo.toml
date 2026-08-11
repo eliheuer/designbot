@@ -52,7 +52,7 @@ vello = "0.3"
 vello_cpu = "0.0.4"
 kurbo = "0.12"
 peniko = "0.5"
-parley = "0.2"
+parley = "0.8"
 swash = "0.1"
 
 # AnyRender abstraction

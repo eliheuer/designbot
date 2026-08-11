@@ -23,8 +23,8 @@ use anyrender_vello_cpu::VelloCpuImageRenderer;
 use kurbo::Shape;
 use color::AlphaColor;
 use peniko::Fill;
-use parley::{FontContext, LayoutContext, layout::PositionedLayoutItem};
-use parley::style::{FontFamily, FontFeature, FontSettings, FontStack, FontVariation, StyleProperty};
+use parley::{FontContext, LayoutContext, layout::{AlignmentOptions, PositionedLayoutItem}};
+use parley::style::{FontFamily, FontFeature, FontFeatures, FontVariation, FontVariations, StyleProperty};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::path::Path;
@@ -94,25 +94,24 @@ impl Renderer {
     ) -> f64 {
         let mut font_cx = FontContext::default();
         for font_data in &self.custom_fonts {
-            font_cx.collection.register_fonts(font_data.clone());
+            font_cx.collection.register_fonts(font_data.clone().into(), None);
         }
         let mut layout_cx: LayoutContext<[u8; 4]> = LayoutContext::new();
-        let mut builder = layout_cx.ranged_builder(&mut font_cx, text, 1.0);
+        let mut builder = layout_cx.ranged_builder(&mut font_cx, text, 1.0, false);
 
         if let Some(family) = font_family {
-            let family = FontFamily::Named(Cow::Borrowed(family));
-            builder.push_default(StyleProperty::FontStack(FontStack::Single(family)));
+            builder.push_default(StyleProperty::FontFamily(FontFamily::named(family)));
         }
         builder.push_default(StyleProperty::FontSize(font_size as f32));
         if !variations.is_empty() {
             let settings: Vec<FontVariation> = variations
                 .iter()
                 .map(|(tag, value)| FontVariation {
-                    tag: *tag,
+                    tag: parley::setting::Tag::new(&tag.to_be_bytes()),
                     value: *value,
                 })
                 .collect();
-            builder.push_default(StyleProperty::FontVariations(FontSettings::List(
+            builder.push_default(StyleProperty::FontVariations(FontVariations::List(
                 Cow::Owned(settings),
             )));
         }
@@ -129,7 +128,7 @@ impl Renderer {
         // Create font context once and register custom fonts
         let mut font_cx = FontContext::default();
         for font_data in &self.custom_fonts {
-            font_cx.collection.register_fonts(font_data.clone());
+            font_cx.collection.register_fonts(font_data.clone().into(), None);
         }
         let font_cx = RefCell::new(font_cx);
 
@@ -418,7 +417,7 @@ impl Renderer {
 
         let mut font_cx = FontContext::default();
         for font_data in &self.custom_fonts {
-            font_cx.collection.register_fonts(font_data.clone());
+            font_cx.collection.register_fonts(font_data.clone().into(), None);
         }
         let font_cx = RefCell::new(font_cx);
 
@@ -525,7 +524,7 @@ impl Renderer {
     ) -> Result<(), DesignBotError> {
         let mut font_cx = FontContext::default();
         for font_data in &self.custom_fonts {
-            font_cx.collection.register_fonts(font_data.clone());
+            font_cx.collection.register_fonts(font_data.clone().into(), None);
         }
         let font_cx = RefCell::new(font_cx);
 
@@ -821,12 +820,11 @@ impl Renderer {
         let mut layout_cx: LayoutContext<[u8; 4]> = LayoutContext::new();
 
         // Create a layout builder
-        let mut builder = layout_cx.ranged_builder(&mut *font_cx_ref, text, 1.0);
+        let mut builder = layout_cx.ranged_builder(&mut *font_cx_ref, text, 1.0, false);
 
         // Set font family if specified
         if let Some(family) = font_family {
-            let font_family = FontFamily::Named(Cow::Borrowed(family));
-            builder.push_default(StyleProperty::FontStack(FontStack::Single(font_family)));
+            builder.push_default(StyleProperty::FontFamily(FontFamily::named(family)));
         }
 
         // Set font size
@@ -836,7 +834,9 @@ impl Renderer {
         // parley's LineHeight is a multiplier of the font size, so convert.
         if let Some(lh) = line_height {
             if font_size > 0.0 {
-                builder.push_default(StyleProperty::LineHeight((lh / font_size) as f32));
+                builder.push_default(StyleProperty::LineHeight(
+                    parley::style::LineHeight::FontSizeRelative((lh / font_size) as f32),
+                ));
             }
         }
 
@@ -850,11 +850,11 @@ impl Renderer {
             let settings: Vec<FontVariation> = variations
                 .iter()
                 .map(|(tag, value)| FontVariation {
-                    tag: *tag,
+                    tag: parley::setting::Tag::new(&tag.to_be_bytes()),
                     value: *value,
                 })
                 .collect();
-            builder.push_default(StyleProperty::FontVariations(FontSettings::List(
+            builder.push_default(StyleProperty::FontVariations(FontVariations::List(
                 Cow::Owned(settings),
             )));
         }
@@ -864,11 +864,11 @@ impl Renderer {
             let settings: Vec<FontFeature> = features
                 .iter()
                 .map(|(tag, value)| FontFeature {
-                    tag: *tag,
+                    tag: parley::setting::Tag::new(&tag.to_be_bytes()),
                     value: *value,
                 })
                 .collect();
-            builder.push_default(StyleProperty::FontFeatures(FontSettings::List(
+            builder.push_default(StyleProperty::FontFeatures(FontFeatures::List(
                 Cow::Owned(settings),
             )));
         }
@@ -885,14 +885,14 @@ impl Renderer {
         // For LTR text: Start=left, Middle=center, End=right
         let parley_align = match align {
             designbot_core::canvas::TextAlign::Left => parley::layout::Alignment::Start,
-            designbot_core::canvas::TextAlign::Center => parley::layout::Alignment::Middle,
+            designbot_core::canvas::TextAlign::Center => parley::layout::Alignment::Center,
             designbot_core::canvas::TextAlign::Right => parley::layout::Alignment::End,
             designbot_core::canvas::TextAlign::Start => parley::layout::Alignment::Start,
             designbot_core::canvas::TextAlign::End => parley::layout::Alignment::End,
-            designbot_core::canvas::TextAlign::Justified => parley::layout::Alignment::Justified,
+            designbot_core::canvas::TextAlign::Justified => parley::layout::Alignment::Justify,
         };
 
-        layout.align(max_width, parley_align);
+        layout.align(max_width, parley_align, AlignmentOptions::default());
 
         // For single-line text without a container width, manually adjust x position
         // based on text width and alignment (like DrawBot)
@@ -965,7 +965,7 @@ impl Renderer {
                             .normalized_coords(run.normalized_coords().iter().copied())
                             .build();
 
-                        if let Some(outline) = scaler.scale_outline(glyph.id) {
+                        if let Some(outline) = scaler.scale_outline(glyph.id as u16) {
                             let mut path = kurbo::BezPath::new();
 
                             // Convert swash path to kurbo path
@@ -1015,13 +1015,14 @@ impl Renderer {
                             // glyph.x / glyph.y carry the shaper's per-glyph
                             // placement (GPOS mark attachment and cursive
                             // rises — essential for Arabic, vital for
-                            // Nastaliq). User space is y-up, same sign as the
-                            // shaper's, so they add directly.
+                            // Nastaliq). Parley 0.8 emits glyph.y in its
+                            // y-down layout space; user space here is y-up,
+                            // so it subtracts.
                             let glyph_x = adjusted_x
                                 + line_x_offset
                                 + glyph_x_offset as f64
                                 + glyph.x as f64;
-                            let glyph_y = line_y + glyph.y as f64;
+                            let glyph_y = line_y - glyph.y as f64;
 
                             // Font glyphs are y-up, exactly like DrawBot user
                             // space; the command transform already carries the
