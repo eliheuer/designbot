@@ -155,6 +155,20 @@ fn is_arabic(cp: u32) -> bool {
         | 0xFB50..=0xFDFF | 0xFE70..=0xFEFF)
 }
 
+/// Drop every vowel mark, leaving the rasm — the bare consonant skeleton that
+/// ordinary Arabic prose is actually set in. Setting the same passage both
+/// ways is the only way to see what the marks cost: the bare column is the
+/// spacing and colour on their own, the vocalised one is what the marks do to
+/// them.
+fn strip_harakat(s: &str) -> String {
+    s.chars()
+        .filter(|c| {
+            !matches!(*c as u32,
+                0x064B..=0x0655 | 0x0656..=0x065F | 0x0670 | 0x06D6..=0x06ED)
+        })
+        .collect()
+}
+
 /// Whether the font really supports Arabic, rather than happening to carry a
 /// stray codepoint from the block. A handful of latin fonts encode an Arabic
 /// comma or percent sign for punctuation coverage; one of those must not pull
@@ -1185,6 +1199,52 @@ impl<'a> Proof<'a> {
         }
     }
 
+    /// Each letter tripled and joined, then standing alone: ننن ن. The oldest
+    /// Arabic spacing test there is. A run of one letter exposes rhythm no
+    /// mixed word can — a tooth that is too wide, a join that sits at the
+    /// wrong height, a counter that closes up when its neighbours arrive —
+    /// and setting the isolated form beside it shows whether the joined and
+    /// unjoined shapes belong to the same letter.
+    fn arabic_repetition(&mut self) {
+        self.new_sheet("Arabic", "Repetition — Joined Runs & Isolated");
+        let fam = self.fam();
+
+        let ncols = 3;
+        let nrows = AR_LETTERS.len().div_ceil(ncols);
+        let top = H - 118.0;
+        let cell_w = (W - 2.0 * M) / ncols as f64;
+        let cell_h = (top - M) / nrows as f64;
+
+        for (i, &(ch, label, _)) in AR_LETTERS.iter().enumerate() {
+            // columns run right to left, like the script
+            let cx = M + (ncols - 1 - i / nrows) as f64 * cell_w;
+            let base_y = top - ((i % nrows) as f64 + 0.62) * cell_h;
+
+            self.ctx
+                .no_stroke()
+                .font(MONO)
+                .clear_font_variations()
+                .fill(faint())
+                .font_size(MONO_SIZE * 0.75)
+                .text_align(TextAlign::Left);
+            self.ctx.text(label, cx, base_y);
+
+            // three of the letter joined, a space, then the letter alone
+            let run = format!("{ch}{ch}{ch} {ch}");
+            self.ctx
+                .no_stroke()
+                .fill(ink())
+                .font(&fam)
+                .clear_font_variations()
+                .font_variation("wght", 400.0)
+                .font_size(cell_h * 0.40)
+                .tracking(0.0)
+                .auto_line_height()
+                .text_align(TextAlign::Right);
+            self.ctx.text(&run, cx + cell_w - 16.0, base_y);
+        }
+    }
+
     /// Every vowel mark on every skeleton. Each column is one mark, each row
     /// one base: scanning down a column shows whether the mark sits on a level
     /// line, and across a row whether the anchors agree with each other.
@@ -1425,33 +1485,31 @@ impl<'a> Proof<'a> {
     /// vocalised passage is where uneven colour, a mark that sits a touch too
     /// high, and spacing that only fails in aggregate become visible.
     fn arabic_long_text(&mut self) {
+        let bare = strip_harakat(AR_YUSUF);
         for (size, leading) in [(13.0_f64, 30.0_f64), (9.5, 22.0)] {
             self.new_sheet(
                 "Arabic",
-                &format!("Long Text — Surah Yusuf, {}pt", num(size as f32)),
+                &format!(
+                    "Long Text — Surah Yusuf, {}pt — vocalised vs bare",
+                    num(size as f32)
+                ),
             );
             let fam = self.fam();
-            let top = H - 124.0;
+            let top = H - 132.0;
             let half = (W - 2.0 * M - GUTTER) / 2.0;
 
-            // Two columns, right one first so the reading order runs right to
-            // left across the spread as well as within each column.
-            let chars = AR_YUSUF.chars().count();
-            let split = AR_YUSUF
-                .char_indices()
-                .nth(chars / 2)
-                .map(|(i, _)| i)
-                .unwrap_or(AR_YUSUF.len());
-            let split = AR_YUSUF[split..]
-                .find(' ')
-                .map(|o| split + o)
-                .unwrap_or(split);
-
-            for (ci, part) in [&AR_YUSUF[..split], &AR_YUSUF[split..]]
-                .iter()
-                .enumerate()
+            // The same passage twice, so the two columns can be read against
+            // each other line for line: the right one carries its harakat,
+            // the left one is stripped. Everything that differs between them
+            // is the marks and nothing else — which is what makes a mark
+            // sitting too high, or crowding its neighbour, obvious.
+            for (ci, (text, label)) in
+                [(AR_YUSUF, "vocalised"), (bare.as_str(), "bare")]
+                    .iter()
+                    .enumerate()
             {
                 let x = M + (1 - ci) as f64 * (half + GUTTER);
+                self.mono_caption(label, x, top + 14.0);
                 self.ctx
                     .no_stroke()
                     .fill(ink())
@@ -1462,7 +1520,7 @@ impl<'a> Proof<'a> {
                     .tracking(0.0)
                     .line_height(leading)
                     .text_align(TextAlign::Right);
-                self.ctx.text_box(part.trim(), x, M, half, top - M);
+                self.ctx.text_box(text.trim(), x, M, half, top - M);
             }
         }
     }
@@ -1526,6 +1584,7 @@ pub fn generate_proof(
     if covers_arabic(&facts.cmap) {
         proof.arabic_char_set();
         proof.arabic_joining();
+        proof.arabic_repetition();
         proof.arabic_marks();
         proof.arabic_clusters();
         proof.arabic_text();
