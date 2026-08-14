@@ -155,6 +155,23 @@ fn is_arabic(cp: u32) -> bool {
         | 0xFB50..=0xFDFF | 0xFE70..=0xFEFF)
 }
 
+/// Whether the font really supports Arabic, rather than happening to carry a
+/// stray codepoint from the block. A handful of latin fonts encode an Arabic
+/// comma or percent sign for punctuation coverage; one of those must not pull
+/// in eleven pages the font cannot fill. The test is the letters themselves:
+/// the proof needs most of the alphabet before its tables mean anything.
+fn covers_arabic(cmap: &[(u32, u16)]) -> bool {
+    let have = AR_LETTERS
+        .iter()
+        .filter(|(ch, _, _)| {
+            ch.chars()
+                .next()
+                .is_some_and(|c| cmap.binary_search_by_key(&(c as u32), |&(cp, _)| cp).is_ok())
+        })
+        .count();
+    have * 4 >= AR_LETTERS.len() * 3
+}
+
 /// The combining marks inside those ranges — harakat, hamza and the Quranic
 /// annotations. They need a dotted circle to be legible on their own.
 fn is_arabic_mark(cp: u32) -> bool {
@@ -1506,7 +1523,7 @@ pub fn generate_proof(
 
     // Arabic pages only when the font actually covers the script, so a
     // latin-only proof is unchanged.
-    if facts.cmap.iter().any(|&(cp, _)| is_arabic(cp)) {
+    if covers_arabic(&facts.cmap) {
         proof.arabic_char_set();
         proof.arabic_joining();
         proof.arabic_marks();
