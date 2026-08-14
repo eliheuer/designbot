@@ -29,6 +29,140 @@ const GRID_ROWS: u32 = 6;
 /// head, technical data) — the proof's information layer is uniform.
 const MONO_SIZE: f64 = 8.5;
 
+// --- Arabic proof data ------------------------------------------------------
+
+/// Zero-width joiner: forces a letter into a positional form without adding
+/// the ink that tatweel would.
+const ZWJ: &str = "\u{200D}";
+
+/// The letters in hija'i order with a latin label. The flag marks the
+/// dual-joining ones; the right-joining letters (alef, dal, reh, waw and
+/// relatives) have no initial or medial form, and the table leaves those
+/// cells empty rather than showing a fake.
+const AR_LETTERS: &[(&str, &str, bool)] = &[
+    ("\u{0627}", "alef", false),
+    ("\u{0628}", "beh", true),
+    ("\u{062A}", "teh", true),
+    ("\u{062B}", "theh", true),
+    ("\u{062C}", "jeem", true),
+    ("\u{062D}", "hah", true),
+    ("\u{062E}", "khah", true),
+    ("\u{062F}", "dal", false),
+    ("\u{0630}", "thal", false),
+    ("\u{0631}", "reh", false),
+    ("\u{0632}", "zain", false),
+    ("\u{0633}", "seen", true),
+    ("\u{0634}", "sheen", true),
+    ("\u{0635}", "sad", true),
+    ("\u{0636}", "dad", true),
+    ("\u{0637}", "tah", true),
+    ("\u{0638}", "zah", true),
+    ("\u{0639}", "ain", true),
+    ("\u{063A}", "ghain", true),
+    ("\u{0641}", "feh", true),
+    ("\u{0642}", "qaf", true),
+    ("\u{0643}", "kaf", true),
+    ("\u{0644}", "lam", true),
+    ("\u{0645}", "meem", true),
+    ("\u{0646}", "noon", true),
+    ("\u{0647}", "heh", true),
+    ("\u{0648}", "waw", false),
+    ("\u{064A}", "yeh", true),
+];
+
+/// The vowel marks, in the order they are usually taught.
+const AR_HARAKAT: &[(&str, &str)] = &[
+    ("\u{064E}", "fatha"),
+    ("\u{064F}", "damma"),
+    ("\u{0650}", "kasra"),
+    ("\u{0652}", "sukun"),
+    ("\u{0651}", "shadda"),
+    ("\u{064B}", "fathatan"),
+    ("\u{064C}", "dammatan"),
+    ("\u{064D}", "kasratan"),
+];
+
+/// Bases spanning the skeletons: bare stroke, tooth, bowl, loop, wide sweep,
+/// ascender, descender — so one page shows every anchor height in the font.
+const AR_MARK_BASES: &[&str] = &[
+    "\u{0627}", "\u{0628}", "\u{062C}", "\u{062F}", "\u{0631}", "\u{0633}",
+    "\u{0635}", "\u{0637}", "\u{0639}", "\u{0641}", "\u{0643}", "\u{0644}",
+    "\u{0645}", "\u{0646}", "\u{0647}", "\u{0648}", "\u{064A}",
+];
+
+/// Words where two dotted letters meet. Dot clusters collide here first,
+/// because the dots sit nearest the joining seam.
+const AR_DOT_RUNS: &[(&str, &str)] = &[
+    ("\u{0628}\u{064A}\u{062A}", "bayt"),
+    ("\u{0628}\u{0646}\u{062A}", "bint"),
+    ("\u{062A}\u{0628}\u{064A}\u{0646}", "tabyin"),
+    ("\u{0646}\u{062A}\u{064A}\u{062C}\u{0629}", "natija"),
+    ("\u{062B}\u{0642}\u{0627}\u{0641}\u{0629}", "thaqafa"),
+    ("\u{062A}\u{0641}\u{062A}\u{064A}\u{0634}", "taftish"),
+    ("\u{064A}\u{0628}\u{062F}\u{0623}", "yabda"),
+    ("\u{0634}\u{062E}\u{0635}", "shakhs"),
+];
+
+/// The abjad sequence: every letter once, the Arabic equivalent of a pangram.
+const AR_TEXT_PLAIN: &str = "\u{0623}\u{0628}\u{062C}\u{062F} \u{0647}\u{0648}\u{0632} \u{062D}\u{0637}\u{064A} \u{0643}\u{0644}\u{0645}\u{0646} \u{0633}\u{0639}\u{0641}\u{0635} \u{0642}\u{0631}\u{0634}\u{062A} \u{062B}\u{062E}\u{0630} \u{0636}\u{0638}\u{063A}";
+
+/// Fully vocalised, so mark stacking is exercised in running context.
+const AR_TEXT_VOCAL: &str = "\u{0627}\u{0644}\u{0652}\u{062D}\u{064E}\u{0645}\u{0652}\u{062F}\u{064F} \u{0644}\u{0650}\u{0644}\u{0651}\u{064E}\u{0647}\u{0650} \u{0631}\u{064E}\u{0628}\u{0651}\u{0650} \u{0627}\u{0644}\u{0652}\u{0639}\u{064E}\u{0627}\u{0644}\u{064E}\u{0645}\u{0650}\u{064A}\u{0646}\u{064E}";
+
+/// The four lam-alef ligatures, which every Arabic font must form.
+const AR_LAM_ALEF: &[(&str, &str)] = &[
+    ("\u{0644}\u{0627}", "lam-alef"),
+    ("\u{0644}\u{0622}", "lam-alef madda"),
+    ("\u{0644}\u{0623}", "lam-alef hamza above"),
+    ("\u{0644}\u{0625}", "lam-alef hamza below"),
+];
+
+/// Al-Fatiha in the Uthmani orthography, byte-exact from tanzil via
+/// api.alquran.cloud. The canonical Arabic specimen text and the densest
+/// ordinary test of mark stacking: alef wasla, superscript alef, shadda
+/// over fatha, and tanwin all appear in seven short lines.
+const AR_FATIHA: &[&str] = &[
+    "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ",
+    "ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ",
+    "ٱلرَّحْمَٰنِ ٱلرَّحِيمِ",
+    "مَٰلِكِ يَوْمِ ٱلدِّينِ",
+    "إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ",
+    "ٱهْدِنَا ٱلصِّرَٰطَ ٱلْمُسْتَقِيمَ",
+    "صِرَٰطَ ٱلَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ ٱلْمَغْضُوبِ عَلَيْهِمْ وَلَا ٱلضَّآلِّينَ",
+];
+
+/// Three short surahs in the simple orthography, which drops the Quranic
+/// annotation marks and so stays inside an ordinary Arabic character set.
+const AR_SURAHS: &[(&str, &str)] = &[
+    ("Al-Ikhlas 112", "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ قُلْ هُوَ اللَّهُ أَحَدٌ اللَّهُ الصَّمَدُ لَمْ يَلِدْ وَلَمْ يُولَدْ وَلَمْ يَكُنْ لَهُ كُفُوًا أَحَدٌ"),
+    ("Al-Asr 103", "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ وَالْعَصْرِ إِنَّ الْإِنْسَانَ لَفِي خُسْرٍ إِلَّا الَّذِينَ آمَنُوا وَعَمِلُوا الصَّالِحَاتِ وَتَوَاصَوْا بِالْحَقِّ وَتَوَاصَوْا بِالصَّبْرِ"),
+    ("Ash-Sharh 94", "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ أَلَمْ نَشْرَحْ لَكَ صَدْرَكَ وَوَضَعْنَا عَنْكَ وِزْرَكَ الَّذِي أَنْقَضَ ظَهْرَكَ وَرَفَعْنَا لَكَ ذِكْرَكَ فَإِنَّ مَعَ الْعُسْرِ يُسْرًا إِنَّ مَعَ الْعُسْرِ يُسْرًا فَإِذَا فَرَغْتَ فَانْصَبْ وَإِلَىٰ رَبِّكَ فَارْغَبْ"),
+];
+
+/// Surah Yusuf, ayat 1-46, simple orthography, byte-exact from tanzil via
+/// api.alquran.cloud. The waqf (pause) marks are dropped: they are later
+/// recitation annotations rather than part of the words, and no ordinary
+/// Arabic character set encodes them. Long, fully vocalised running text is
+/// the test that catches what short samples miss — line after line of mark
+/// stacking, and colour that only shows at reading size.
+const AR_YUSUF: &str = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ الر تِلْكَ آيَاتُ الْكِتَابِ الْمُبِينِ إِنَّا أَنْزَلْنَاهُ قُرْآنًا عَرَبِيًّا لَعَلَّكُمْ تَعْقِلُونَ نَحْنُ نَقُصُّ عَلَيْكَ أَحْسَنَ الْقَصَصِ بِمَا أَوْحَيْنَا إِلَيْكَ هَٰذَا الْقُرْآنَ وَإِنْ كُنْتَ مِنْ قَبْلِهِ لَمِنَ الْغَافِلِينَ إِذْ قَالَ يُوسُفُ لِأَبِيهِ يَا أَبَتِ إِنِّي رَأَيْتُ أَحَدَ عَشَرَ كَوْكَبًا وَالشَّمْسَ وَالْقَمَرَ رَأَيْتُهُمْ لِي سَاجِدِينَ قَالَ يَا بُنَيَّ لَا تَقْصُصْ رُؤْيَاكَ عَلَىٰ إِخْوَتِكَ فَيَكِيدُوا لَكَ كَيْدًا إِنَّ الشَّيْطَانَ لِلْإِنْسَانِ عَدُوٌّ مُبِينٌ وَكَذَٰلِكَ يَجْتَبِيكَ رَبُّكَ وَيُعَلِّمُكَ مِنْ تَأْوِيلِ الْأَحَادِيثِ وَيُتِمُّ نِعْمَتَهُ عَلَيْكَ وَعَلَىٰ آلِ يَعْقُوبَ كَمَا أَتَمَّهَا عَلَىٰ أَبَوَيْكَ مِنْ قَبْلُ إِبْرَاهِيمَ وَإِسْحَاقَ إِنَّ رَبَّكَ عَلِيمٌ حَكِيمٌ لَقَدْ كَانَ فِي يُوسُفَ وَإِخْوَتِهِ آيَاتٌ لِلسَّائِلِينَ إِذْ قَالُوا لَيُوسُفُ وَأَخُوهُ أَحَبُّ إِلَىٰ أَبِينَا مِنَّا وَنَحْنُ عُصْبَةٌ إِنَّ أَبَانَا لَفِي ضَلَالٍ مُبِينٍ اقْتُلُوا يُوسُفَ أَوِ اطْرَحُوهُ أَرْضًا يَخْلُ لَكُمْ وَجْهُ أَبِيكُمْ وَتَكُونُوا مِنْ بَعْدِهِ قَوْمًا صَالِحِينَ قَالَ قَائِلٌ مِنْهُمْ لَا تَقْتُلُوا يُوسُفَ وَأَلْقُوهُ فِي غَيَابَتِ الْجُبِّ يَلْتَقِطْهُ بَعْضُ السَّيَّارَةِ إِنْ كُنْتُمْ فَاعِلِينَ قَالُوا يَا أَبَانَا مَا لَكَ لَا تَأْمَنَّا عَلَىٰ يُوسُفَ وَإِنَّا لَهُ لَنَاصِحُونَ أَرْسِلْهُ مَعَنَا غَدًا يَرْتَعْ وَيَلْعَبْ وَإِنَّا لَهُ لَحَافِظُونَ قَالَ إِنِّي لَيَحْزُنُنِي أَنْ تَذْهَبُوا بِهِ وَأَخَافُ أَنْ يَأْكُلَهُ الذِّئْبُ وَأَنْتُمْ عَنْهُ غَافِلُونَ قَالُوا لَئِنْ أَكَلَهُ الذِّئْبُ وَنَحْنُ عُصْبَةٌ إِنَّا إِذًا لَخَاسِرُونَ فَلَمَّا ذَهَبُوا بِهِ وَأَجْمَعُوا أَنْ يَجْعَلُوهُ فِي غَيَابَتِ الْجُبِّ وَأَوْحَيْنَا إِلَيْهِ لَتُنَبِّئَنَّهُمْ بِأَمْرِهِمْ هَٰذَا وَهُمْ لَا يَشْعُرُونَ وَجَاءُوا أَبَاهُمْ عِشَاءً يَبْكُونَ قَالُوا يَا أَبَانَا إِنَّا ذَهَبْنَا نَسْتَبِقُ وَتَرَكْنَا يُوسُفَ عِنْدَ مَتَاعِنَا فَأَكَلَهُ الذِّئْبُ وَمَا أَنْتَ بِمُؤْمِنٍ لَنَا وَلَوْ كُنَّا صَادِقِينَ وَجَاءُوا عَلَىٰ قَمِيصِهِ بِدَمٍ كَذِبٍ قَالَ بَلْ سَوَّلَتْ لَكُمْ أَنْفُسُكُمْ أَمْرًا فَصَبْرٌ جَمِيلٌ وَاللَّهُ الْمُسْتَعَانُ عَلَىٰ مَا تَصِفُونَ وَجَاءَتْ سَيَّارَةٌ فَأَرْسَلُوا وَارِدَهُمْ فَأَدْلَىٰ دَلْوَهُ قَالَ يَا بُشْرَىٰ هَٰذَا غُلَامٌ وَأَسَرُّوهُ بِضَاعَةً وَاللَّهُ عَلِيمٌ بِمَا يَعْمَلُونَ وَشَرَوْهُ بِثَمَنٍ بَخْسٍ دَرَاهِمَ مَعْدُودَةٍ وَكَانُوا فِيهِ مِنَ الزَّاهِدِينَ وَقَالَ الَّذِي اشْتَرَاهُ مِنْ مِصْرَ لِامْرَأَتِهِ أَكْرِمِي مَثْوَاهُ عَسَىٰ أَنْ يَنْفَعَنَا أَوْ نَتَّخِذَهُ وَلَدًا وَكَذَٰلِكَ مَكَّنَّا لِيُوسُفَ فِي الْأَرْضِ وَلِنُعَلِّمَهُ مِنْ تَأْوِيلِ الْأَحَادِيثِ وَاللَّهُ غَالِبٌ عَلَىٰ أَمْرِهِ وَلَٰكِنَّ أَكْثَرَ النَّاسِ لَا يَعْلَمُونَ وَلَمَّا بَلَغَ أَشُدَّهُ آتَيْنَاهُ حُكْمًا وَعِلْمًا وَكَذَٰلِكَ نَجْزِي الْمُحْسِنِينَ وَرَاوَدَتْهُ الَّتِي هُوَ فِي بَيْتِهَا عَنْ نَفْسِهِ وَغَلَّقَتِ الْأَبْوَابَ وَقَالَتْ هَيْتَ لَكَ قَالَ مَعَاذَ اللَّهِ إِنَّهُ رَبِّي أَحْسَنَ مَثْوَايَ إِنَّهُ لَا يُفْلِحُ الظَّالِمُونَ وَلَقَدْ هَمَّتْ بِهِ وَهَمَّ بِهَا لَوْلَا أَنْ رَأَىٰ بُرْهَانَ رَبِّهِ كَذَٰلِكَ لِنَصْرِفَ عَنْهُ السُّوءَ وَالْفَحْشَاءَ إِنَّهُ مِنْ عِبَادِنَا الْمُخْلَصِينَ وَاسْتَبَقَا الْبَابَ وَقَدَّتْ قَمِيصَهُ مِنْ دُبُرٍ وَأَلْفَيَا سَيِّدَهَا لَدَى الْبَابِ قَالَتْ مَا جَزَاءُ مَنْ أَرَادَ بِأَهْلِكَ سُوءًا إِلَّا أَنْ يُسْجَنَ أَوْ عَذَابٌ أَلِيمٌ قَالَ هِيَ رَاوَدَتْنِي عَنْ نَفْسِي وَشَهِدَ شَاهِدٌ مِنْ أَهْلِهَا إِنْ كَانَ قَمِيصُهُ قُدَّ مِنْ قُبُلٍ فَصَدَقَتْ وَهُوَ مِنَ الْكَاذِبِينَ وَإِنْ كَانَ قَمِيصُهُ قُدَّ مِنْ دُبُرٍ فَكَذَبَتْ وَهُوَ مِنَ الصَّادِقِينَ فَلَمَّا رَأَىٰ قَمِيصَهُ قُدَّ مِنْ دُبُرٍ قَالَ إِنَّهُ مِنْ كَيْدِكُنَّ إِنَّ كَيْدَكُنَّ عَظِيمٌ يُوسُفُ أَعْرِضْ عَنْ هَٰذَا وَاسْتَغْفِرِي لِذَنْبِكِ إِنَّكِ كُنْتِ مِنَ الْخَاطِئِينَ وَقَالَ نِسْوَةٌ فِي الْمَدِينَةِ امْرَأَتُ الْعَزِيزِ تُرَاوِدُ فَتَاهَا عَنْ نَفْسِهِ قَدْ شَغَفَهَا حُبًّا إِنَّا لَنَرَاهَا فِي ضَلَالٍ مُبِينٍ فَلَمَّا سَمِعَتْ بِمَكْرِهِنَّ أَرْسَلَتْ إِلَيْهِنَّ وَأَعْتَدَتْ لَهُنَّ مُتَّكَأً وَآتَتْ كُلَّ وَاحِدَةٍ مِنْهُنَّ سِكِّينًا وَقَالَتِ اخْرُجْ عَلَيْهِنَّ فَلَمَّا رَأَيْنَهُ أَكْبَرْنَهُ وَقَطَّعْنَ أَيْدِيَهُنَّ وَقُلْنَ حَاشَ لِلَّهِ مَا هَٰذَا بَشَرًا إِنْ هَٰذَا إِلَّا مَلَكٌ كَرِيمٌ قَالَتْ فَذَٰلِكُنَّ الَّذِي لُمْتُنَّنِي فِيهِ وَلَقَدْ رَاوَدْتُهُ عَنْ نَفْسِهِ فَاسْتَعْصَمَ وَلَئِنْ لَمْ يَفْعَلْ مَا آمُرُهُ لَيُسْجَنَنَّ وَلَيَكُونًا مِنَ الصَّاغِرِينَ قَالَ رَبِّ السِّجْنُ أَحَبُّ إِلَيَّ مِمَّا يَدْعُونَنِي إِلَيْهِ وَإِلَّا تَصْرِفْ عَنِّي كَيْدَهُنَّ أَصْبُ إِلَيْهِنَّ وَأَكُنْ مِنَ الْجَاهِلِينَ فَاسْتَجَابَ لَهُ رَبُّهُ فَصَرَفَ عَنْهُ كَيْدَهُنَّ إِنَّهُ هُوَ السَّمِيعُ الْعَلِيمُ ثُمَّ بَدَا لَهُمْ مِنْ بَعْدِ مَا رَأَوُا الْآيَاتِ لَيَسْجُنُنَّهُ حَتَّىٰ حِينٍ وَدَخَلَ مَعَهُ السِّجْنَ فَتَيَانِ قَالَ أَحَدُهُمَا إِنِّي أَرَانِي أَعْصِرُ خَمْرًا وَقَالَ الْآخَرُ إِنِّي أَرَانِي أَحْمِلُ فَوْقَ رَأْسِي خُبْزًا تَأْكُلُ الطَّيْرُ مِنْهُ نَبِّئْنَا بِتَأْوِيلِهِ إِنَّا نَرَاكَ مِنَ الْمُحْسِنِينَ قَالَ لَا يَأْتِيكُمَا طَعَامٌ تُرْزَقَانِهِ إِلَّا نَبَّأْتُكُمَا بِتَأْوِيلِهِ قَبْلَ أَنْ يَأْتِيَكُمَا ذَٰلِكُمَا مِمَّا عَلَّمَنِي رَبِّي إِنِّي تَرَكْتُ مِلَّةَ قَوْمٍ لَا يُؤْمِنُونَ بِاللَّهِ وَهُمْ بِالْآخِرَةِ هُمْ كَافِرُونَ وَاتَّبَعْتُ مِلَّةَ آبَائِي إِبْرَاهِيمَ وَإِسْحَاقَ وَيَعْقُوبَ مَا كَانَ لَنَا أَنْ نُشْرِكَ بِاللَّهِ مِنْ شَيْءٍ ذَٰلِكَ مِنْ فَضْلِ اللَّهِ عَلَيْنَا وَعَلَى النَّاسِ وَلَٰكِنَّ أَكْثَرَ النَّاسِ لَا يَشْكُرُونَ يَا صَاحِبَيِ السِّجْنِ أَأَرْبَابٌ مُتَفَرِّقُونَ خَيْرٌ أَمِ اللَّهُ الْوَاحِدُ الْقَهَّارُ مَا تَعْبُدُونَ مِنْ دُونِهِ إِلَّا أَسْمَاءً سَمَّيْتُمُوهَا أَنْتُمْ وَآبَاؤُكُمْ مَا أَنْزَلَ اللَّهُ بِهَا مِنْ سُلْطَانٍ إِنِ الْحُكْمُ إِلَّا لِلَّهِ أَمَرَ أَلَّا تَعْبُدُوا إِلَّا إِيَّاهُ ذَٰلِكَ الدِّينُ الْقَيِّمُ وَلَٰكِنَّ أَكْثَرَ النَّاسِ لَا يَعْلَمُونَ يَا صَاحِبَيِ السِّجْنِ أَمَّا أَحَدُكُمَا فَيَسْقِي رَبَّهُ خَمْرًا وَأَمَّا الْآخَرُ فَيُصْلَبُ فَتَأْكُلُ الطَّيْرُ مِنْ رَأْسِهِ قُضِيَ الْأَمْرُ الَّذِي فِيهِ تَسْتَفْتِيَانِ وَقَالَ لِلَّذِي ظَنَّ أَنَّهُ نَاجٍ مِنْهُمَا اذْكُرْنِي عِنْدَ رَبِّكَ فَأَنْسَاهُ الشَّيْطَانُ ذِكْرَ رَبِّهِ فَلَبِثَ فِي السِّجْنِ بِضْعَ سِنِينَ وَقَالَ الْمَلِكُ إِنِّي أَرَىٰ سَبْعَ بَقَرَاتٍ سِمَانٍ يَأْكُلُهُنَّ سَبْعٌ عِجَافٌ وَسَبْعَ سُنْبُلَاتٍ خُضْرٍ وَأُخَرَ يَابِسَاتٍ يَا أَيُّهَا الْمَلَأُ أَفْتُونِي فِي رُؤْيَايَ إِنْ كُنْتُمْ لِلرُّؤْيَا تَعْبُرُونَ قَالُوا أَضْغَاثُ أَحْلَامٍ وَمَا نَحْنُ بِتَأْوِيلِ الْأَحْلَامِ بِعَالِمِينَ وَقَالَ الَّذِي نَجَا مِنْهُمَا وَادَّكَرَ بَعْدَ أُمَّةٍ أَنَا أُنَبِّئُكُمْ بِتَأْوِيلِهِ فَأَرْسِلُونِ يُوسُفُ أَيُّهَا الصِّدِّيقُ أَفْتِنَا فِي سَبْعِ بَقَرَاتٍ سِمَانٍ يَأْكُلُهُنَّ سَبْعٌ عِجَافٌ وَسَبْعِ سُنْبُلَاتٍ خُضْرٍ وَأُخَرَ يَابِسَاتٍ لَعَلِّي أَرْجِعُ إِلَى النَّاسِ لَعَلَّهُمْ يَعْلَمُونَ";
+
+/// Arabic script ranges: the base block, the supplements used by Persian and
+/// Urdu, and the presentation forms.
+fn is_arabic(cp: u32) -> bool {
+    matches!(cp,
+        0x0600..=0x06FF | 0x0750..=0x077F | 0x08A0..=0x08FF
+        | 0xFB50..=0xFDFF | 0xFE70..=0xFEFF)
+}
+
+/// The combining marks inside those ranges — harakat, hamza and the Quranic
+/// annotations. They need a dotted circle to be legible on their own.
+fn is_arabic_mark(cp: u32) -> bool {
+    matches!(cp,
+        0x064B..=0x065F | 0x0670 | 0x06D6..=0x06DC | 0x06DF..=0x06E4
+        | 0x06E7..=0x06E8 | 0x06EA..=0x06ED | 0x0610..=0x061A | 0x08D3..=0x08FF)
+}
+
 /// Width of a single grid column.
 fn col_w() -> f64 {
     (W - 2.0 * M - (COLS as f64 - 1.0) * GUTTER) / COLS as f64
@@ -868,6 +1002,454 @@ impl<'a> Proof<'a> {
         }
     }
 
+    // --- Arabic ------------------------------------------------------------
+
+    /// Every encoded Arabic codepoint, laid out like the main character set.
+    /// Covers the base block plus the presentation forms, so a missing or
+    /// misencoded glyph shows up as a gap.
+    fn arabic_char_set(&mut self) {
+        self.new_sheet("Arabic", "Arabic Character Set");
+        let glyphs: Vec<u32> = self
+            .facts
+            .cmap
+            .iter()
+            .map(|&(cp, _)| cp)
+            .filter(|&cp| is_arabic(cp) && char::from_u32(cp).is_some())
+            .collect();
+        let count = glyphs.len().max(1);
+
+        let content_w = W - 2.0 * M;
+        let top = H - 104.0;
+        let content_h = top - M;
+        let ncols = {
+            let ideal = (1.5 * count as f64).sqrt() / COLS as f64;
+            (ideal.round().max(1.0) as usize * COLS).max(COLS)
+        };
+        let nrows = count.div_ceil(ncols);
+        let cell_w = content_w / ncols as f64;
+        let cell_h = content_h / nrows as f64;
+        let glyph_size = (cell_h * 0.52).min(cell_w * 0.72);
+        let labels = cell_h >= 20.0;
+
+        for (idx, &cp) in glyphs.iter().enumerate() {
+            let ch = char::from_u32(cp).unwrap();
+            let x = M + (idx % ncols) as f64 * cell_w;
+            let cell_bottom = top - (idx / ncols + 1) as f64 * cell_h;
+            let cx = x + cell_w / 2.0;
+
+            self.ctx.no_fill().stroke(rule()).stroke_width(0.3);
+            self.ctx.rect(x, cell_bottom, cell_w, cell_h);
+
+            // Combining marks render on a dotted circle so they are visible
+            // and their attachment height is legible on their own.
+            let shown = if is_arabic_mark(cp) {
+                format!("\u{25CC}{}", ch)
+            } else {
+                ch.to_string()
+            };
+            self.ctx
+                .no_stroke()
+                .fill(ink())
+                .font(&self.facts.family)
+                .clear_font_variations()
+                .font_variation("wght", 400.0)
+                .font_size(glyph_size)
+                .tracking(0.0)
+                .auto_line_height()
+                .text_align(TextAlign::Center);
+            let base = cell_bottom + if labels { cell_h * 0.40 } else { cell_h * 0.32 };
+            self.ctx.text(&shown, cx, base);
+
+            if labels {
+                self.ctx
+                    .no_stroke()
+                    .font(MONO)
+                    .clear_font_variations()
+                    .fill(hair())
+                    .font_size(4.5)
+                    .text_align(TextAlign::Center);
+                self.ctx.text(&format!("{:04X}", cp), cx, cell_bottom + 2.5);
+            }
+        }
+    }
+
+    /// Right-aligned body text. Arabic reads from the right edge, so every
+    /// Arabic row on these pages is set flush right against the same margin.
+    fn set_body_rtl(&mut self, fam: &str, size: f64) {
+        self.ctx
+            .no_stroke()
+            .fill(ink())
+            .font(fam)
+            .clear_font_variations()
+            .font_variation("wght", 400.0)
+            .font_size(size)
+            .tracking(0.0)
+            .auto_line_height()
+            .text_align(TextAlign::Right);
+    }
+
+    /// One letter in a chosen positional form, using ZWJ rather than tatweel
+    /// so the cell shows the letterform and nothing else. `prev` means a
+    /// letter joins on the reading-preceding side (giving final or medial).
+    fn positional(ch: &str, prev: bool, next: bool) -> String {
+        format!(
+            "{}{}{}",
+            if prev { ZWJ } else { "" },
+            ch,
+            if next { ZWJ } else { "" }
+        )
+    }
+
+    /// The four positional forms of every letter, one row each. This is the
+    /// page that catches a wrong or missing `init`/`medi`/`fina` substitution
+    /// and any joining stub that does not meet its neighbour.
+    fn arabic_joining(&mut self) {
+        self.new_sheet("Arabic", "Joining — Positional Forms");
+        let fam = self.fam();
+        let headers = ["isolated", "final", "medial", "initial"];
+
+        // Two half-page tables side by side, 14 letters each.
+        let half = AR_LETTERS.len().div_ceil(2);
+        let block_w = (W - 2.0 * M - GUTTER) / 2.0;
+        let top = H - 118.0;
+        let row_h = (top - M) / half as f64;
+
+        for (bi, chunk) in AR_LETTERS.chunks(half).enumerate() {
+            let x0 = M + bi as f64 * (block_w + GUTTER);
+            let cell_w = block_w / 5.0;
+
+            for (i, h) in headers.iter().enumerate() {
+                self.ctx
+                    .no_stroke()
+                    .font(MONO)
+                    .clear_font_variations()
+                    .fill(hair())
+                    .font_size(MONO_SIZE * 0.72)
+                    .text_align(TextAlign::Center);
+                self.ctx
+                    .text(h, x0 + cell_w * (1.5 + i as f64), top + 8.0);
+            }
+
+            for (ri, &(ch, label, dual)) in chunk.iter().enumerate() {
+                let base_y = top - (ri as f64 + 0.72) * row_h;
+
+                self.ctx
+                    .no_stroke()
+                    .font(MONO)
+                    .clear_font_variations()
+                    .fill(faint())
+                    .font_size(MONO_SIZE * 0.8)
+                    .text_align(TextAlign::Left);
+                self.ctx.text(label, x0, base_y);
+
+                // isolated, final, medial, initial
+                let forms = [
+                    Some(Self::positional(ch, false, false)),
+                    Some(Self::positional(ch, true, false)),
+                    dual.then(|| Self::positional(ch, true, true)),
+                    dual.then(|| Self::positional(ch, false, true)),
+                ];
+                for (i, form) in forms.iter().enumerate() {
+                    let Some(form) = form else { continue };
+                    self.ctx
+                        .no_stroke()
+                        .fill(ink())
+                        .font(&fam)
+                        .clear_font_variations()
+                        .font_variation("wght", 400.0)
+                        .font_size(row_h * 0.5)
+                        .tracking(0.0)
+                        .auto_line_height()
+                        .text_align(TextAlign::Center);
+                    self.ctx
+                        .text(form, x0 + cell_w * (1.5 + i as f64), base_y);
+                }
+            }
+        }
+    }
+
+    /// Every vowel mark on every skeleton. Each column is one mark, each row
+    /// one base: scanning down a column shows whether the mark sits on a level
+    /// line, and across a row whether the anchors agree with each other.
+    fn arabic_marks(&mut self) {
+        // Split across sheets so the cells stay big enough to judge a few
+        // units of drift; a single page squeezes below-marks into the rule.
+        let per_page = AR_MARK_BASES.len().div_ceil(2);
+        for (page, bases) in AR_MARK_BASES.chunks(per_page).enumerate() {
+            self.arabic_marks_sheet(bases, page + 1);
+        }
+    }
+
+    fn arabic_marks_sheet(&mut self, bases: &[&str], page: usize) {
+        self.new_sheet(
+            "Arabic",
+            &format!("Mark Attachment — Harakat on Every Skeleton ({page}/2)"),
+        );
+        let fam = self.fam();
+
+        let top = H - 122.0;
+        let label_w = 34.0;
+        let cell_w = (W - 2.0 * M - label_w) / AR_HARAKAT.len() as f64;
+        let row_h = (top - M) / bases.len() as f64;
+
+        for (ci, &(_, name)) in AR_HARAKAT.iter().enumerate() {
+            self.ctx
+                .no_stroke()
+                .font(MONO)
+                .clear_font_variations()
+                .fill(hair())
+                .font_size(MONO_SIZE * 0.72)
+                .text_align(TextAlign::Center);
+            self.ctx.text(
+                name,
+                M + label_w + cell_w * (ci as f64 + 0.5),
+                top + 8.0,
+            );
+        }
+
+        for (ri, &base) in bases.iter().enumerate() {
+            // The baseline rule is the reference: scanning down a column, every
+            // above-mark should sit the same distance off it.
+            let base_y = top - (ri as f64 + 0.62) * row_h;
+            self.ctx.no_fill().stroke(hair()).stroke_width(0.25);
+            self.ctx.line(M, base_y, W - M, base_y);
+
+            for (ci, &(mark, _)) in AR_HARAKAT.iter().enumerate() {
+                self.ctx
+                    .no_stroke()
+                    .fill(ink())
+                    .font(&fam)
+                    .clear_font_variations()
+                    .font_variation("wght", 400.0)
+                    .font_size(row_h * 0.52)
+                    .tracking(0.0)
+                    .auto_line_height()
+                    .text_align(TextAlign::Center);
+                self.ctx.text(
+                    &format!("{}{}", base, mark),
+                    M + label_w + cell_w * (ci as f64 + 0.5),
+                    base_y,
+                );
+            }
+        }
+    }
+
+    /// Dots against dots, and the lam-alef ligatures. Both are places where
+    /// Arabic goes wrong quietly: clusters merge into a blob, or a required
+    /// ligature silently fails to form.
+    fn arabic_clusters(&mut self) {
+        self.new_sheet("Arabic", "Dot Clusters & Ligatures");
+        let fam = self.fam();
+        let half = (W - 2.0 * M - GUTTER) / 2.0;
+        // right column first: Arabic is read from the right edge of the page
+        let cols: [(f64, &str, &[(&str, &str)]); 2] = [
+            (W - M, "Adjacent dotted letters", AR_DOT_RUNS),
+            (M + half, "Lam-alef — all four must ligate", AR_LAM_ALEF),
+        ];
+        let top = H - 128.0;
+
+        for (right_edge, caption, rows) in cols {
+            let label_x = right_edge - half;
+            self.mono_caption(caption, label_x, top);
+            let mut y = top - 48.0;
+            let step = ((top - 48.0 - M) / AR_DOT_RUNS.len() as f64).min(58.0);
+            for (seq, latin) in rows {
+                self.set_body_rtl(&fam, step * 0.62);
+                self.ctx.text(seq, right_edge, y);
+                self.ctx
+                    .no_stroke()
+                    .font(MONO)
+                    .clear_font_variations()
+                    .fill(faint())
+                    .font_size(MONO_SIZE * 0.8)
+                    .text_align(TextAlign::Left);
+                self.ctx.text(latin, label_x, y);
+                y -= step;
+            }
+        }
+    }
+
+    /// Arabic in running text, plain and fully vocalised, down the sizes.
+    /// Vocalised is where mark-to-mark stacking and vertical collisions show.
+    fn arabic_text(&mut self) {
+        self.new_sheet("Arabic", "Running Text & Waterfall");
+        let fam = self.fam();
+        let mut y = H - 126.0;
+
+        self.mono_caption("Abjad — every letter once", M, y);
+        y -= 40.0;
+        for size in [30.0_f64, 22.0, 16.0] {
+            self.set_body_rtl(&fam, size);
+            self.ctx.text(AR_TEXT_PLAIN, W - M, y);
+            y -= size * 1.7;
+        }
+
+        y -= 22.0;
+        self.mono_caption("Vocalised — mark stacking in context", M, y);
+        y -= 44.0;
+        for size in [34.0_f64, 26.0, 20.0, 15.0, 11.0] {
+            self.set_body_rtl(&fam, size);
+            self.ctx.text(AR_TEXT_VOCAL, W - M, y);
+            y -= size * 1.9;
+        }
+    }
+
+    /// The same Arabic line at each named instance, so the eye can check that
+    /// mark anchors do not drift sideways or vertically across the axis.
+    fn arabic_weights(&mut self) {
+        if self.facts.instances.is_empty() {
+            return;
+        }
+        self.new_sheet("Arabic", "Weights — Anchor Drift Across the Axis");
+        let fam = self.fam();
+        let sample = "\u{0628}\u{064E}\u{0628}\u{064E}\u{0628}\u{064E} \u{0627}\u{064E} \u{0645}\u{064F}\u{062D}\u{064E}\u{0645}\u{0651}\u{064E}\u{062F}";
+
+        let instances: Vec<(String, Vec<f32>)> = self
+            .facts
+            .instances
+            .iter()
+            .map(|i| (i.name.clone(), i.values.clone()))
+            .collect();
+        let top = H - 130.0;
+        let step = (top - M) / instances.len() as f64;
+
+        for (i, (name, values)) in instances.iter().enumerate() {
+            let y = top - (i as f64 + 0.62) * step;
+            self.ctx
+                .no_stroke()
+                .font(MONO)
+                .clear_font_variations()
+                .fill(faint())
+                .font_size(MONO_SIZE * 0.8)
+                .text_align(TextAlign::Left);
+            self.ctx.text(name, M, y);
+
+            self.ctx
+                .no_stroke()
+                .fill(ink())
+                .font(&fam)
+                .clear_font_variations()
+                .font_size(step * 0.46)
+                .tracking(0.0)
+                .auto_line_height()
+                .text_align(TextAlign::Right);
+            for (axis, value) in self.facts.axes.iter().zip(values.iter()) {
+                self.ctx.font_variation(&axis.tag, *value);
+            }
+            self.ctx.text(sample, W - M, y);
+        }
+    }
+
+    /// Al-Fatiha, ayah per line, then the same ayah down the sizes. Fully
+    /// vocalised scripture is the hardest ordinary test of mark stacking:
+    /// shadda over fatha, tanwin, superscript alef and alef wasla all appear
+    /// inside seven short lines, so whatever collides shows up here first.
+    fn arabic_quran(&mut self) {
+        self.new_sheet("Arabic", "Quranic Text — Al-Fatiha (Uthmani)");
+        let fam = self.fam();
+        let mut y = H - 128.0;
+
+        for (i, ayah) in AR_FATIHA.iter().enumerate() {
+            self.set_body_rtl(&fam, 26.0);
+            self.ctx.text(ayah, W - M, y);
+            self.ctx
+                .no_stroke()
+                .font(MONO)
+                .clear_font_variations()
+                .fill(faint())
+                .font_size(MONO_SIZE * 0.8)
+                .text_align(TextAlign::Left);
+            self.ctx.text(&format!("{}", i + 1), M, y);
+            y -= 44.0;
+        }
+
+        y -= 14.0;
+        self.mono_caption("Down the sizes", M, y);
+        y -= 32.0;
+        for size in [20.0_f64, 15.0, 11.0, 8.0] {
+            self.set_body_rtl(&fam, size);
+            self.ctx.text(AR_FATIHA[1], W - M, y);
+            y -= size * 2.0;
+        }
+    }
+
+    /// Three short surahs as running paragraphs in the simple orthography.
+    /// Wrapping is where line-breaking meets mark stacking.
+    fn arabic_quran_running(&mut self) {
+        self.new_sheet("Arabic", "Quranic Text — Running Paragraphs");
+        let fam = self.fam();
+        let top = H - 126.0;
+        let block_h = (top - M) / AR_SURAHS.len() as f64;
+
+        for (i, (label, text)) in AR_SURAHS.iter().enumerate() {
+            let block_top = top - i as f64 * block_h;
+            self.mono_caption(label, M, block_top);
+            self.ctx
+                .no_stroke()
+                .fill(ink())
+                .font(&fam)
+                .clear_font_variations()
+                .font_variation("wght", 400.0)
+                .font_size(19.0)
+                .tracking(0.0)
+                .line_height(38.0)
+                .text_align(TextAlign::Right);
+            self.ctx.text_box(
+                text,
+                M,
+                block_top - block_h + 22.0,
+                W - 2.0 * M,
+                block_h - 40.0,
+            );
+        }
+    }
+
+    /// Surah Yusuf at reading sizes. Short samples flatter a face; a long
+    /// vocalised passage is where uneven colour, a mark that sits a touch too
+    /// high, and spacing that only fails in aggregate become visible.
+    fn arabic_long_text(&mut self) {
+        for (size, leading) in [(13.0_f64, 30.0_f64), (9.5, 22.0)] {
+            self.new_sheet(
+                "Arabic",
+                &format!("Long Text — Surah Yusuf, {}pt", num(size as f32)),
+            );
+            let fam = self.fam();
+            let top = H - 124.0;
+            let half = (W - 2.0 * M - GUTTER) / 2.0;
+
+            // Two columns, right one first so the reading order runs right to
+            // left across the spread as well as within each column.
+            let chars = AR_YUSUF.chars().count();
+            let split = AR_YUSUF
+                .char_indices()
+                .nth(chars / 2)
+                .map(|(i, _)| i)
+                .unwrap_or(AR_YUSUF.len());
+            let split = AR_YUSUF[split..]
+                .find(' ')
+                .map(|o| split + o)
+                .unwrap_or(split);
+
+            for (ci, part) in [&AR_YUSUF[..split], &AR_YUSUF[split..]]
+                .iter()
+                .enumerate()
+            {
+                let x = M + (1 - ci) as f64 * (half + GUTTER);
+                self.ctx
+                    .no_stroke()
+                    .fill(ink())
+                    .font(&fam)
+                    .clear_font_variations()
+                    .font_variation("wght", 400.0)
+                    .font_size(size)
+                    .tracking(0.0)
+                    .line_height(leading)
+                    .text_align(TextAlign::Right);
+                self.ctx.text_box(part.trim(), x, M, half, top - M);
+            }
+        }
+    }
+
     /// Shared body-text setup for the diacritic/kerning rows.
     fn set_body(&mut self, fam: &str, size: f64) {
         self.ctx
@@ -921,6 +1503,20 @@ pub fn generate_proof(
     proof.kerning();
     proof.weight_waterfall();
     proof.interpolation();
+
+    // Arabic pages only when the font actually covers the script, so a
+    // latin-only proof is unchanged.
+    if facts.cmap.iter().any(|&(cp, _)| is_arabic(cp)) {
+        proof.arabic_char_set();
+        proof.arabic_joining();
+        proof.arabic_marks();
+        proof.arabic_clusters();
+        proof.arabic_text();
+        proof.arabic_quran();
+        proof.arabic_quran_running();
+        proof.arabic_long_text();
+        proof.arabic_weights();
+    }
 
     r.render_to_pdf(&proof.ctx, output_path)?;
     Ok(())
