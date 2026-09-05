@@ -1,3 +1,4 @@
+mod scene;
 use anyhow::{Context, Result};
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -76,6 +77,9 @@ fn main() -> Result<()> {
     // `designbot proof …` is handled before the render arg parser (which would
     // otherwise treat "proof" as a positional script path).
     let raw: Vec<String> = std::env::args().collect();
+    if raw.get(1).map(|s| s.as_str()) == Some("render-scene") {
+        return scene::run(&raw[2..]);
+    }
     if raw.get(1).map(|s| s.as_str()) == Some("proof") {
         return run_proof(&raw[2..]);
     }

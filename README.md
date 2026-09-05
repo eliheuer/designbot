@@ -374,3 +374,25 @@ Apache-2.0
 
 Inspired by [DrawBot](https://www.drawbot.com/) by Just van Rossum and Frederik Berlaen.
 Built on crates from the [Linebender](https://github.com/linebender) ecosystem.
+
+
+### Render editor scenes
+
+Runebender can supply live outlines as data without compiling a Rust script:
+
+```sh
+designbot render-scene --png proof.png < scene.json
+designbot render-scene --pdf proof.pdf < scene.json
+```
+
+A version-1 scene uses bottom-left, y-up coordinates:
+
+```json
+{"version":1,"width":256,"height":256,"paths":[{"d":"M32,32 L128,224 L224,32 Z","color":[0,0,0]}],"labels":[]}
+```
+
+Paths contain SVG path data, not SVG documents or code. Optional labels have
+`text`, `x`, `y`, and `size` fields. This command always uses raw output, without
+the script CLI's social-media image adjustments. Input is limited to 8 MiB;
+dimensions are at most 4096 by 4096. It does not load font projects or edit them.
+Runebender resolves live geometry and uses harfrust for its positioned text scenes.
