@@ -40,6 +40,7 @@ pub struct Renderer {
     /// the encoder real texture to hold onto instead of flat fields that
     /// come back "plastic". Set to 0.0 for mathematically clean output.
     grain: f32,
+    crt: bool,
 }
 
 impl Renderer {
@@ -49,6 +50,7 @@ impl Renderer {
             height,
             custom_fonts: Vec::new(),
             grain: 4.0,
+            crt: false,
         }
     }
 
@@ -58,6 +60,12 @@ impl Renderer {
     /// and regenerated every output frame so it reads as film texture.
     pub fn set_grain(&mut self, levels: f32) {
         self.grain = levels.max(0.0);
+    }
+
+    /// Display raster exports on a simulated monochrome CRT with an RGB phosphor mask.
+    /// Alpha is composited onto black. The mask stays fixed across frames.
+    pub fn set_crt(&mut self, enabled: bool) {
+        self.crt = enabled;
     }
 
     /// Load a font from a file path and register it for use
@@ -173,6 +181,9 @@ impl Renderer {
             let duration = page
                 .duration
                 .unwrap_or(designbot_core::canvas::DEFAULT_FRAME_DURATION);
+            if self.crt {
+                apply_crt(&mut rgba_data, self.width, self.height);
+            }
             frames.push((rgba_data, duration));
         }
         frames
@@ -1058,6 +1069,40 @@ impl Renderer {
                     }
                 }
             }
+        }
+    }
+}
+
+fn apply_crt(pixels: &mut [u8], width: u32, height: u32) {
+    use image::{GrayImage, Luma, imageops};
+
+    let luma = GrayImage::from_fn(width, height, |x, y| {
+        let i = 4 * (y * width + x) as usize;
+        let level = 0.2126 * pixels[i] as f32 + 0.7152 * pixels[i + 1] as f32
+            + 0.0722 * pixels[i + 2] as f32;
+        Luma([(level * pixels[i + 3] as f32 / 255.0).round() as u8])
+    });
+    let beam = imageops::blur(&luma, 0.65);
+    let halo = imageops::fast_blur(&luma, 4.0);
+    for y in 0..height {
+        let v = (2.0 * y as f32 + 1.0) / height as f32 - 1.0;
+        let scan = [1.0, 0.66, 0.32, 0.66][y as usize % 4];
+        let wobble = 0.65 * (0.11 * y as f32).sin();
+        for x in 0..width {
+            let u = (2.0 * x as f32 + 1.0) / width as f32 - 1.0;
+            let sx = x as f32 + u * v * v * 6.0 + wobble;
+            let sy = y as f32 + v * u * u * 4.0;
+            let sample = |img: &GrayImage| {
+                imageops::interpolate_bilinear(img, sx, sy).map_or(0.0, |p| p[0] as f32)
+            };
+            let light = 1.75 * scan * sample(&beam);
+            let glow = 0.35 * sample(&halo);
+            let i = 4 * (y * width + x) as usize;
+            for (channel, gain) in [0.87, 1.0, 0.93].into_iter().enumerate() {
+                let mask = if (x / 2) as usize % 3 == channel { 1.0 } else { 0.65 };
+                pixels[i + channel] = (gain * (light * mask + glow)).round() as u8;
+            }
+            pixels[i + 3] = 255;
         }
     }
 }
